@@ -185,6 +185,19 @@ function slotsToAvail(slots) {
   });
   return a;
 }
+function makeGCalUrl(weekKey, di, startH, endH, court) {
+  const sun = new Date(weekKey + 'T00:00:00');
+  sun.setDate(sun.getDate() + di);
+  const p = n => String(n).padStart(2, '0');
+  const d = `${sun.getFullYear()}${p(sun.getMonth()+1)}${p(sun.getDate())}`;
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: 'Padel Match 🎾',
+    dates: `${d}T${p(startH)}0000/${d}T${p(endH)}0000`,
+  });
+  if (court) params.set('location', court);
+  return `https://calendar.google.com/calendar/render?${params}`;
+}
 
 // ─── Overlap engine ───────────────────────────────────────────────────────────
 function computeMatches(avail) {
@@ -629,7 +642,7 @@ function PadelTipWidget({ mySlotCount, onGoSchedule }) {
 }
 
 // ─── SCREEN: Dashboard ────────────────────────────────────────────────────────
-function Dashboard({ matches, players, myPlayerId, bookedMatches, groupId, groupName, onUpdateGroupName, isAdmin, onDeletePlayer, onPick, onGoSchedule, myGroups, onSwitchGroup, onCreateGroup, groupCourt, groupUrl, favGroupId }) {
+function Dashboard({ matches, players, myPlayerId, bookedMatches, groupId, groupName, onUpdateGroupName, isAdmin, onDeletePlayer, onPick, onGoSchedule, myGroups, onSwitchGroup, onCreateGroup, groupCourt, groupUrl, favGroupId, weekKey }) {
   const [copied,         setCopied]         = React.useState(false);
   const [editingGrpName, setEditingGrpName] = React.useState(false);
   const [grpNameInput,   setGrpNameInput]   = React.useState(groupName);
@@ -777,6 +790,12 @@ function Dashboard({ matches, players, myPlayerId, bookedMatches, groupId, group
                 <div className="flex items-center gap-1.5 mt-3">
                   {(m.playerIds||[]).map(pid=>{const p=players.find(pl=>pl.id===pid);return p?<Avatar key={pid} p={p} size="sm"/>:null;})}
                 </div>
+                <a href={makeGCalUrl(weekKey, m.di??0, m.start, m.end, m.court||groupCourt)}
+                  target="_blank" rel="noopener noreferrer"
+                  className="mt-3 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border w-fit"
+                  style={{background:"#f0fdf4",color:"#16a34a",borderColor:"#86efac"}}>
+                  📅 Add to Google Calendar
+                </a>
               </Card>
             ))}
           </div>
@@ -813,35 +832,51 @@ function Dashboard({ matches, players, myPlayerId, bookedMatches, groupId, group
             {matches.slice(0,5).map((m,idx)=>{
               const booked = bookedMatches.some(b=>b.id===m.id);
               return (
-                <button key={m.id} onClick={()=>!booked&&onPick(m)} disabled={booked}
-                  className="w-full text-left rounded-2xl p-3.5 flex items-center gap-3 bg-white border"
-                  style={{borderColor:idx===0&&!booked?BLUE+"44":BORD,boxShadow:"0 1px 3px rgba(0,0,0,0.05)",opacity:booked?0.5:1}}>
-                  <div className="w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0"
-                    style={{background:idx===0&&!booked?BLUE+"15":BG}}>
-                    <span className="text-[11px] font-black" style={{color:idx===0&&!booked?BLUE:TXT3}}>{m.day.slice(0,3).toUpperCase()}</span>
-                    <span className="text-[10px]" style={{color:idx===0&&!booked?BLUE+"aa":TXT3}}>{m.start}h</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold" style={{color:TXT}}>{m.day} · {m.start}:00–{m.end}:00</p>
-                    <div className="flex items-center gap-1 mt-1">
-                      {(m.playerIds||[]).slice(0,4).map(pid=>{
-                        const p=players.find(pl=>pl.id===pid);
-                        return p?<div key={pid} className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold" style={{background:p.color+"22",color:p.color}}>{(p.name||"?")[0]}</div>:null;
-                      })}
-                      {(m.availCount||0)>4&&<span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{background:"#f1f5f9",color:TXT3}}>+{m.availCount-4}</span>}
-                      <span className="text-[10px] ml-0.5" style={{color:TXT3}}>{m.durMins}m</span>
+                <div key={m.id} className="w-full rounded-2xl bg-white border overflow-hidden"
+                  style={{borderColor:idx===0&&!booked?BLUE+"44":BORD,boxShadow:"0 1px 3px rgba(0,0,0,0.05)",opacity:booked?0.6:1}}>
+                  {/* Main row — clickable */}
+                  <div onClick={()=>!booked&&onPick(m)}
+                    className="p-3.5 flex items-center gap-3 text-left"
+                    style={{cursor:booked?"default":"pointer"}}>
+                    <div className="w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0"
+                      style={{background:idx===0&&!booked?BLUE+"15":BG}}>
+                      <span className="text-[11px] font-black" style={{color:idx===0&&!booked?BLUE:TXT3}}>{m.day.slice(0,3).toUpperCase()}</span>
+                      <span className="text-[10px]" style={{color:idx===0&&!booked?BLUE+"aa":TXT3}}>{m.start}h</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold" style={{color:TXT}}>{m.day} · {m.start}:00–{m.end}:00</p>
+                      <div className="flex items-center gap-1 mt-1">
+                        {(m.playerIds||[]).slice(0,4).map(pid=>{
+                          const p=players.find(pl=>pl.id===pid);
+                          return p?<div key={pid} className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold" style={{background:p.color+"22",color:p.color}}>{(p.name||"?")[0]}</div>:null;
+                        })}
+                        {(m.availCount||0)>4&&<span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{background:"#f1f5f9",color:TXT3}}>+{m.availCount-4}</span>}
+                        <span className="text-[10px] ml-0.5" style={{color:TXT3}}>{m.durMins}m</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {booked?(
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border" style={{color:TXT3,borderColor:BORD}}>Booked</span>
+                      ):(<>
+                        {(m.availCount||0)>4&&<span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{background:"#ede9fe",color:"#7c3aed"}}>{m.availCount} free</span>}
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={m.quality==="Perfect"?{background:BLUE+"18",color:BLUE}:{background:"#fef9c3",color:"#a16207"}}>{m.quality}</span>
+                        <ChevronRight size={15} color={TXT3}/>
+                      </>)}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {booked?(
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border" style={{color:TXT3,borderColor:BORD}}>Booked</span>
-                    ):(<>
-                      {(m.availCount||0)>4&&<span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{background:"#ede9fe",color:"#7c3aed"}}>{m.availCount} free</span>}
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={m.quality==="Perfect"?{background:BLUE+"18",color:BLUE}:{background:"#fef9c3",color:"#a16207"}}>{m.quality}</span>
-                      <ChevronRight size={15} color={TXT3}/>
-                    </>)}
+                  {/* Google Calendar button — always visible since 4+ players are confirmed */}
+                  <div className="px-3.5 pb-3 border-t flex items-center gap-2" style={{borderColor:BORD+"88",paddingTop:"10px"}}>
+                    <a href={makeGCalUrl(weekKey, m.di, m.start, m.end, groupCourt)}
+                      target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border"
+                      style={{background:"#f0fdf4",color:"#16a34a",borderColor:"#86efac"}}>
+                      📅 Add to Google Calendar
+                    </a>
+                    <span className="text-[10px] font-semibold px-2 py-1 rounded-lg" style={{background:"#bbf7d0",color:"#15803d"}}>
+                      {m.playerIds?.length??4}/4 players
+                    </span>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -910,7 +945,7 @@ function Dashboard({ matches, players, myPlayerId, bookedMatches, groupId, group
 }
 
 // ─── SCREEN: Availability ─────────────────────────────────────────────────────
-function Availability({ mySlots, setMySlots, groupPlayers, weekKey, weekOffset, setWeekOffset }) {
+function Availability({ mySlots, setMySlots, groupPlayers, weekKey, weekOffset, setWeekOffset, myPlayerId }) {
   const [mode, setMode] = React.useState("me");
   const [smartQuery, setSmartQuery] = React.useState('');
   const [smartFeedback, setSmartFeedback] = React.useState('');
@@ -918,9 +953,22 @@ function Availability({ mySlots, setMySlots, groupPlayers, weekKey, weekOffset, 
 
   const showFeedback = msg => { clearTimeout(fbTimer.current); setSmartFeedback(msg); fbTimer.current=setTimeout(()=>setSmartFeedback(''),3500); };
 
+  // Compute which slots are full (4+ players) and current player is NOT one of them
+  const lockedRef = React.useRef(new Set());
+  const lockedSet = new Set();
+  HOURS.forEach(h => {
+    DAYS.forEach((_, di) => {
+      const key = `${di}-${h}`;
+      const occupants = Object.entries(groupPlayers).filter(([, p]) => p.weeks?.[weekKey]?.[key]);
+      const iAmIn = myPlayerId && occupants.some(([pid]) => pid === myPlayerId);
+      if (occupants.length >= 4 && !iAmIn) lockedSet.add(key);
+    });
+  });
+  lockedRef.current = lockedSet;
+
   const drag = React.useRef({ on:false, action:null, lastKey:'' });
   const cellFromPoint = (x,y) => { const el=document.elementFromPoint(x,y); const di=el?.getAttribute('data-di'); const h=el?.getAttribute('data-h'); return(di!=null&&h!=null)?{di:+di,h:+h}:null; };
-  const paintCell = React.useCallback((di,h,action)=>{ const key=`${di}-${h}`; if(drag.current.lastKey===key)return; drag.current.lastKey=key; setMySlots(prev=>{const n={...prev};if(action==="add")n[key]=true;else delete n[key];return n;}); },[setMySlots]);
+  const paintCell = React.useCallback((di,h,action)=>{ const key=`${di}-${h}`; if(drag.current.lastKey===key)return; drag.current.lastKey=key; if(action==="add"&&lockedRef.current.has(key))return; setMySlots(prev=>{const n={...prev};if(action==="add")n[key]=true;else delete n[key];return n;}); },[setMySlots]);
   const onGridDown = e => { if(mode!=="me")return; e.preventDefault(); const cell=cellFromPoint(e.clientX,e.clientY); if(!cell)return; const action=mySlots[`${cell.di}-${cell.h}`]?"remove":"add"; drag.current={on:true,action,lastKey:''}; paintCell(cell.di,cell.h,action); e.currentTarget.setPointerCapture?.(e.pointerId); };
   const onGridMove = e => { if(!drag.current.on||mode!=="me")return; const cell=cellFromPoint(e.clientX,e.clientY); if(cell)paintCell(cell.di,cell.h,drag.current.action); };
   const onGridUp   = () => { drag.current={on:false,action:null,lastKey:''}; };
@@ -978,16 +1026,20 @@ function Availability({ mySlots, setMySlots, groupPlayers, weekKey, weekOffset, 
               <div key={h} className="flex items-center gap-px">
                 <div className="w-10 flex-shrink-0 text-right pr-1.5 text-[9px]" style={{color:TXT3,pointerEvents:"none"}}>{h}:00</div>
                 {DAYS.map((_,di)=>{
-                  const isMine=!!mySlots[`${di}-${h}`];
+                  const key=`${di}-${h}`;
+                  const isMine=!!mySlots[key];
                   const gc=groupCount(di,h);
-                  let bg,border;
-                  if(mode==="group"){ const oc=OVERLAP_COLORS[Math.min(gc,4)]; bg=oc.bg; border=oc.border; }
-                  else if(isMine){ bg="#bef264"; border="#84cc16"; }
-                  else { bg="#f8fafc"; border="#e2e8f0"; }
+                  const isLocked=mode==="me"&&lockedRef.current.has(key);
+                  let bg,border,cursor;
+                  if(mode==="group"){ const oc=OVERLAP_COLORS[Math.min(gc,4)]; bg=oc.bg; border=oc.border; cursor="default"; }
+                  else if(isLocked){ bg="#e2e8f0"; border="#94a3b8"; cursor="not-allowed"; }
+                  else if(isMine){ bg="#bef264"; border="#84cc16"; cursor="crosshair"; }
+                  else { bg="#f8fafc"; border="#e2e8f0"; cursor="crosshair"; }
                   return (
                     <div key={di} data-di={di} data-h={h}
                       className="flex-1 h-6 rounded-sm"
-                      style={{background:bg,border:`1px solid ${border}`,cursor:mode==="me"?"crosshair":"default",touchAction:"none",pointerEvents:"all"}}
+                      style={{background:bg,border:`1px solid ${border}`,cursor,touchAction:"none",pointerEvents:"all",opacity:isLocked?0.55:1}}
+                      title={isLocked?"Slot full — 4/4 players signed up":undefined}
                     />
                   );
                 })}
@@ -1257,7 +1309,7 @@ function SettingsScreen({ userName,setUserName,userRating,setUserRating,groupNam
 }
 
 // ─── SCREEN: Match Detail ─────────────────────────────────────────────────────
-function MatchDetail({ match, players, courts, preferredCourt, onBack, onBook, onSchedule }) {
+function MatchDetail({ match, players, courts, preferredCourt, onBack, onBook, onSchedule, weekKey, groupCourt }) {
   const [booked, setBooked]           = React.useState(false);
   const [selectedCourt, setSelected]  = React.useState(preferredCourt||courts[0]||null);
   const matchPlayers = (match.playerIds||[]).map(pid=>players.find(p=>p.id===pid)).filter(Boolean);
@@ -1346,6 +1398,14 @@ function MatchDetail({ match, players, courts, preferredCourt, onBack, onBook, o
           style={booked?{background:BLUE+"18",color:BLUE,border:`1px solid ${BLUE}44`}:{background:BLUE,color:"#fff"}}>
           {booked?<><CheckCircle size={18} color={BLUE}/> Match Booked!</>:"Book This Match"}
         </button>
+        {weekKey && (
+          <a href={makeGCalUrl(weekKey, match.di, match.start, match.end, selectedCourt||groupCourt)}
+            target="_blank" rel="noopener noreferrer"
+            className="mt-2 flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl text-sm font-bold border"
+            style={{background:"#f0fdf4",color:"#16a34a",borderColor:"#86efac"}}>
+            📅 Add to Google Calendar
+          </a>
+        )}
         <button onClick={onSchedule} className="w-full py-2.5 text-sm text-center mt-1" style={{color:TXT3}}>
           Adjust My Availability →
         </button>
@@ -1652,12 +1712,13 @@ function PadelMeet() {
             myGroups={myGroups} onSwitchGroup={handleSwitchGroup} onCreateGroup={handleCreateGroup}
             groupCourt={groupCourt}
             groupUrl={`${window.location.origin}${window.location.pathname}?group=${groupId}`}
-            favGroupId={favGroupId}/>
+            favGroupId={favGroupId} weekKey={weekKey}/>
         )}
         {screen==='availability' && (
           <Availability mySlots={mySlots} setMySlots={setMySlots}
             groupPlayers={groupData.players||{}} weekKey={weekKey}
-            weekOffset={weekOffset} setWeekOffset={setWeekOffset}/>
+            weekOffset={weekOffset} setWeekOffset={setWeekOffset}
+            myPlayerId={myGroupEntry?.playerId}/>
         )}
         {screen==='preferences' && (
           <SettingsScreen
@@ -1676,7 +1737,8 @@ function PadelMeet() {
           <MatchDetail match={picked} players={players} courts={courts}
             preferredCourt={preferredCourt}
             onBack={()=>setScreen('dashboard')} onBook={bookMatch}
-            onSchedule={()=>setScreen('availability')}/>
+            onSchedule={()=>setScreen('availability')}
+            weekKey={weekKey} groupCourt={groupCourt}/>
         )}
       </main>
 
