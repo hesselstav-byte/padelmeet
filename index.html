@@ -473,23 +473,39 @@ function OnboardingScreen({ onCreate, onJoinCode }) {
 }
 
 // ─── SCREEN: Join Group ───────────────────────────────────────────────────────
-function JoinGroupScreen({ groupId, existingCount, onJoin }) {
-  const isCreator = existingCount===0;
+function JoinGroupScreen({ groupId, existingCount, onJoin, groupPlayers }) {
+  const isCreator = existingCount === 0;
   const [groupName, setGroupName] = React.useState('');
   const [name,      setName]      = React.useState('');
   const [rating,    setRating]    = React.useState(3.0);
-  const canSubmit = name.trim() && (!isCreator || groupName.trim());
-  const doJoin = () => { if (canSubmit) onJoin({ name:name.trim(), rating, groupName:groupName.trim() }); };
+
+  // Real-time: find an existing Firebase player whose name matches what's typed
+  const matchedPlayer = React.useMemo(() => {
+    if (!name.trim() || isCreator) return null;
+    return Object.values(groupPlayers || {}).find(
+      p => (p.name || '').trim().toLowerCase() === name.trim().toLowerCase()
+    ) || null;
+  }, [name, groupPlayers, isCreator]);
+
+  const isReturning = !!matchedPlayer;
+  const canSubmit   = name.trim() && (!isCreator || groupName.trim());
+  const doJoin      = () => { if (canSubmit) onJoin({ name:name.trim(), rating, groupName:groupName.trim() }); };
+
   return (
     <div className="max-w-md mx-auto px-4 py-8 flex flex-col gap-5">
       <div className="text-center">
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-3 text-white" style={{background:BLUE}}>🎾</div>
-        <h1 className="text-xl font-black" style={{color:TXT}}>{isCreator?"Create Your Group":"Join the Group"}</h1>
+        <h1 className="text-xl font-black" style={{color:TXT}}>
+          {isCreator ? "Create Your Group" : isReturning ? "Welcome Back!" : "Join the Group"}
+        </h1>
         <p className="text-sm mt-1" style={{color:TXT2}}>
-          {isCreator?"You'll be the first — invite friends after!":`${existingCount} player${existingCount!==1?'s':''} already in this group`}
+          {isCreator
+            ? "You'll be the first — invite friends after!"
+            : `${existingCount} player${existingCount!==1?'s':''} already in this group`}
         </p>
         <p className="text-[10px] mt-1 font-mono" style={{color:TXT3}}>#{groupId}</p>
       </div>
+
       {isCreator && (
         <div>
           <p className="text-[11px] uppercase tracking-widest font-bold mb-2" style={{color:TXT2}}>
@@ -503,20 +519,56 @@ function JoinGroupScreen({ groupId, existingCount, onJoin }) {
           {!groupName.trim()&&<p className="text-[10px] mt-1" style={{color:"#dc2626"}}>Required — helps you identify this group later</p>}
         </div>
       )}
+
       <div>
         <p className="text-[11px] uppercase tracking-widest font-bold mb-2" style={{color:TXT2}}>Your Name</p>
         <input id="playerNameInput" value={name} onChange={e=>setName(e.target.value)}
-          onKeyDown={e=>e.key==='Enter'&&doJoin()} placeholder="How should we call you?"
+          onKeyDown={e=>e.key==='Enter'&&doJoin()}
+          placeholder={isCreator ? "How should we call you?" : "Enter your name to join or reconnect"}
           autoFocus={!isCreator} maxLength={20}
           className="w-full px-4 py-3.5 rounded-xl text-sm border"
-          style={{background:SURF,borderColor:BLUE+"66",color:TXT}}
+          style={{background:SURF,borderColor:isReturning?"#16a34a":BLUE+"66",color:TXT,transition:"border-color .2s"}}
         />
+        {/* Returning user — profile found */}
+        {isReturning && (
+          <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg"
+            style={{background:"#dcfce7",border:"1px solid #86efac"}}>
+            <CheckCircle size={14} color="#16a34a"/>
+            <p className="text-xs font-semibold" style={{color:"#15803d"}}>
+              Profile found — tap to reconnect as {matchedPlayer.name}!
+            </p>
+          </div>
+        )}
+        {/* New user hint */}
+        {!isCreator && !isReturning && name.trim() && (
+          <p className="text-[10px] mt-1.5" style={{color:TXT3}}>
+            Name not found in this group — you'll be added as a new player.
+          </p>
+        )}
+        {/* Hint for users who haven't typed yet */}
+        {!isCreator && !name.trim() && (
+          <p className="text-[10px] mt-1.5" style={{color:TXT3}}>
+            Been here before on another device? Enter the same name to reconnect automatically.
+          </p>
+        )}
       </div>
-      <RatingInput rating={rating} setRating={setRating}/>
+
+      {/* Hide rating input for returning users — their existing rating is preserved */}
+      {!isReturning && <RatingInput rating={rating} setRating={setRating}/>}
+      {isReturning && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+          style={{background:BLUE+"08",border:`1px solid ${BLUE}22`}}>
+          <CheckCircle size={16} color={BLUE}/>
+          <p className="text-xs" style={{color:TXT2}}>
+            Your rating (<strong>{(matchedPlayer.rating||3).toFixed(1)}</strong>) and availability history will be restored from the group.
+          </p>
+        </div>
+      )}
+
       <button onClick={doJoin} disabled={!canSubmit}
         className="w-full py-4 rounded-2xl text-base font-black text-white"
-        style={{background:canSubmit?BLUE:"#94a3b8"}}>
-        {isCreator?"Create Group 🎾":"Join Group 🎾"}
+        style={{background:canSubmit?(isReturning?"#16a34a":BLUE):"#94a3b8",transition:"background .2s"}}>
+        {isCreator ? "Create Group 🎾" : isReturning ? "Reconnect 🎾" : "Join Group 🎾"}
       </button>
     </div>
   );
@@ -1472,19 +1524,50 @@ function PadelMeet() {
   };
 
   const handleJoin = ({ name, rating, groupName:gName }) => {
-    const existing = Object.keys(groupData.players||{});
-    const isAdmin  = existing.length === 0;
-    const color    = PLAYER_COLORS[existing.length % PLAYER_COLORS.length];
-    const playerId = generatePlayerId();
-    setMyProfile({ name, rating });
-    setMyGroups(prev => {
-      const filtered = prev.filter(g => g.id!==groupId);
-      return [...filtered, { id:groupId, name:gName||groupData.name||'', playerId, color, isAdmin }];
-    });
-    if (db&&groupId) {
-      db.ref(`groups/${groupId}/players/${playerId}`).set({ name,rating,color, weeks:{ [weekKey]:{} }, joinedAt:Date.now() });
-      if (gName) db.ref(`groups/${groupId}/name`).set(gName);
+    const playersObj     = groupData.players || {};
+    const playerEntries  = Object.entries(playersObj);
+
+    // ── Case-insensitive name match: returning user on a new device ──
+    const matchEntry = playerEntries.find(
+      ([, p]) => (p.name||'').trim().toLowerCase() === name.trim().toLowerCase()
+    );
+
+    if (matchEntry) {
+      const [existingPid, existingP] = matchEntry;
+      // Admin = player with the earliest joinedAt (i.e. the original creator)
+      const isAdmin = playerEntries.every(
+        ([pid, p]) => pid === existingPid || (existingP.joinedAt||0) <= (p.joinedAt||Infinity)
+      );
+      // Restore profile from Firebase data
+      setMyProfile({ name: existingP.name, rating: existingP.rating || rating });
+      setMyGroups(prev => ([
+        ...prev.filter(g => g.id !== groupId),
+        { id:groupId, name:groupData.name||'', playerId:existingPid,
+          color:existingP.color||PLAYER_COLORS[0], isAdmin },
+      ]));
+      // Write a lastSeen timestamp so the group knows this device reconnected
+      if (db && groupId) {
+        db.ref(`groups/${groupId}/players/${existingPid}`).update({ lastSeen: Date.now() });
+      }
+
+    } else {
+      // ── New player: create a fresh entry ──
+      const isAdmin  = playerEntries.length === 0;
+      const color    = PLAYER_COLORS[playerEntries.length % PLAYER_COLORS.length];
+      const playerId = generatePlayerId();
+      setMyProfile({ name, rating });
+      setMyGroups(prev => ([
+        ...prev.filter(g => g.id !== groupId),
+        { id:groupId, name:gName||groupData.name||'', playerId, color, isAdmin },
+      ]));
+      if (db && groupId) {
+        db.ref(`groups/${groupId}/players/${playerId}`).set({
+          name, rating, color, weeks:{ [weekKey]:{} }, joinedAt:Date.now()
+        });
+        if (gName) db.ref(`groups/${groupId}/name`).set(gName);
+      }
     }
+
     setScreen('dashboard');
   };
 
@@ -1556,7 +1639,8 @@ function PadelMeet() {
           </div>
         )}
         {screen==='join' && (
-          <JoinGroupScreen groupId={groupId} existingCount={Object.keys(groupData.players||{}).length} onJoin={handleJoin}/>
+          <JoinGroupScreen groupId={groupId} existingCount={Object.keys(groupData.players||{}).length}
+            onJoin={handleJoin} groupPlayers={groupData.players||{}}/>
         )}
         {screen==='dashboard' && (
           <Dashboard matches={matches} players={players} myPlayerId={myGroupEntry?.playerId}
