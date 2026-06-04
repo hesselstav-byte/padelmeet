@@ -1,0 +1,1614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>PadelMeet</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-database-compat.js"></script>
+  <style>
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    html, body { margin: 0; background: #f0f4f8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    input[type=number] { -moz-appearance: textfield; }
+    input, textarea { outline: none; }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-presets="react">
+
+// ─── Firebase Config ──────────────────────────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyDn7E_vgOxgrq1eDD_4OmxJgH3mgafqLWM",
+  authDomain:        "padel-schedule-d8604.firebaseapp.com",
+  databaseURL:       "https://padel-schedule-d8604-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "padel-schedule-d8604",
+  storageBucket:     "padel-schedule-d8604.firebasestorage.app",
+  messagingSenderId: "736122451332",
+  appId:             "1:736122451332:web:18bed3571dd742a28d19d1",
+  measurementId:     "G-181C3M9QPF",
+};
+let db = null;
+const FIREBASE_READY = FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
+if (FIREBASE_READY) {
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.database();
+  } catch(e) { console.error("Firebase init:", e); }
+}
+
+// ─── Theme ────────────────────────────────────────────────────────────────────
+const BLUE  = "#1e40af";   // Deep court blue — primary brand
+const BLUE2 = "#3b82f6";   // Medium blue
+const A     = "#BEFF0A";   // Lime — availability highlight
+const BG    = "#f0f4f8";   // Page background
+const SURF  = "#ffffff";   // Card surface
+const BORD  = "#e2e8f0";   // Border
+const TXT   = "#0f172a";   // Primary text
+const TXT2  = "#475569";   // Secondary text
+const TXT3  = "#94a3b8";   // Muted text
+
+// ─── Colorblind-friendly overlap palette (light-mode adapted) ─────────────────
+const OVERLAP_COLORS = [
+  { bg:"#f1f5f9", border:"#cbd5e1", text:"#94a3b8" },  // 0 — empty
+  { bg:"#dbeafe", border:"#93c5fd", text:"#1d4ed8" },  // 1 — light blue
+  { bg:"#bfdbfe", border:"#3b82f6", text:"#1e40af" },  // 2 — blue
+  { bg:"#fed7aa", border:"#f97316", text:"#c2410c" },  // 3 — orange
+  { bg:"#bbf7d0", border:"#4ade80", text:"#15803d" },  // 4+ — green ✓
+];
+
+// ─── Inline SVG Icons ─────────────────────────────────────────────────────────
+const Svg = ({ size=20, color='currentColor', sw=1.5, children, style, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+    stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"
+    style={style} className={className}>{children}</svg>
+);
+const Zap          = p => <Svg {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></Svg>;
+const CalendarIcon = p => <Svg {...p}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></Svg>;
+const SettingsIcon = p => <Svg {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></Svg>;
+const ChevronRight = p => <Svg {...p}><polyline points="9 18 15 12 9 6"/></Svg>;
+const ChevronLeft  = p => <Svg {...p}><polyline points="15 18 9 12 15 6"/></Svg>;
+const Check        = p => <Svg {...p}><polyline points="20 6 9 17 4 12"/></Svg>;
+const Clock        = p => <Svg {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Svg>;
+const MapPin       = p => <Svg {...p}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></Svg>;
+const Users        = p => <Svg {...p}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></Svg>;
+const Bell         = p => <Svg {...p}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></Svg>;
+const Plus         = p => <Svg {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Svg>;
+const CheckCircle  = p => <Svg {...p}><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></Svg>;
+const CircleIcon   = p => <Svg {...p}><circle cx="12" cy="12" r="10"/></Svg>;
+const TrendingUp   = p => <Svg {...p}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></Svg>;
+const ArrowLeft    = p => <Svg {...p}><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></Svg>;
+const Pencil       = p => <Svg {...p}><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></Svg>;
+const Trash        = p => <Svg {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></Svg>;
+const X            = p => <Svg {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Svg>;
+const ShareIcon    = p => <Svg {...p}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></Svg>;
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const PLAYER_COLORS = ["#1d4ed8","#dc2626","#0891b2","#d97706","#7c3aed","#db2777","#059669","#ea580c"];
+const DAYS  = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const HOURS = Array.from({ length: 16 }, (_, i) => i + 7);
+
+const PADEL_RATINGS = Array.from({ length: 13 }, (_, i) => +(1 + i * 0.5).toFixed(1));
+const RATING_LABEL  = {
+  1.0:"Absolute Beginner", 1.5:"Beginner",    2.0:"Casual",
+  2.5:"Casual+",           3.0:"Intermediate", 3.5:"Intermediate+",
+  4.0:"Upper Inter.",      4.5:"Advanced",     5.0:"Advanced+",
+  5.5:"High Level",        6.0:"Elite Amateur",6.5:"Semi-Pro",
+  7.0:"Professional",
+};
+// ─── Weekly Padel Tip ─────────────────────────────────────────────────────────
+const padelTips = [
+  {
+    title: "🎯 הטיפ השבועי: סודות הלוב והגנת הזכוכית",
+    url:   "https://www.youtube.com/watch?v=htIU01CPbE0"
+  },
+  {
+    title: "🎾 הטיפ השבועי: איך לחבוט Vibora קטלנית ונמוכה",
+    url:   "https://www.youtube.com/watch?v=zoWQ3frFnzk"
+  },
+  {
+    title: "💥 הטיפ השבועי: טקטיקה נכונה לחבטת סמאש (Smash) אפקטיבית",
+    url:   "https://www.youtube.com/watch?v=bRf9ggx5Qc8"
+  },
+  {
+    title: "🏃‍♂️ הטיפ השבועי: מיקום נכון על המגרש (Court Positioning) ותנועה עם השותף",
+    url:   "https://www.youtube.com/watch?v=WfIKQMdtwIE"
+  },
+];
+function getCurrentWeekNumber() {
+  const now  = new Date();
+  const jan1 = new Date(now.getFullYear(), 0, 1);
+  return Math.floor((now - jan1) / (7 * 24 * 60 * 60 * 1000));
+}
+
+const QUICK_PRESETS = [
+  { label:"Weekday Evenings",  sub:"Sun–Thu · 18–22",  days:[0,1,2,3,4], hours:[18,19,20,21]    },
+  { label:"Weekend Morning",   sub:"Fri–Sat · 8–13",   days:[5,6],       hours:[8,9,10,11,12]   },
+  { label:"Weekend Afternoon", sub:"Fri–Sat · 13–18",  days:[5,6],       hours:[13,14,15,16,17] },
+  { label:"Friday Evening",    sub:"Fri · 17–22",       days:[5],         hours:[17,18,19,20,21] },
+];
+
+// ─── Week helpers ─────────────────────────────────────────────────────────────
+function getWeekKey(offset) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset * 7 - d.getDay()); // move to Sunday
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function getWeekLabel(offset) {
+  if (offset === 0) return "This Week";
+  if (offset === 1) return "Next Week";
+  if (offset === -1) return "Last Week";
+  return offset > 0 ? `+${offset} Weeks` : `${Math.abs(offset)} Weeks Ago`;
+}
+function getWeekDateRange(offset) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset * 7 - d.getDay());
+  const sat = new Date(d); sat.setDate(d.getDate() + 6);
+  const f = dt => dt.toLocaleDateString('en', { month:'short', day:'numeric' });
+  return `${f(d)} – ${f(sat)}`;
+}
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+function useLs(key, def) {
+  const [v, setV] = React.useState(() => {
+    try { const s = localStorage.getItem(key); return s != null ? JSON.parse(s) : def; }
+    catch { return def; }
+  });
+  const set = React.useCallback((fn) => {
+    setV(prev => {
+      const next = typeof fn === 'function' ? fn(prev) : fn;
+      try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, [key]);
+  return [v, set];
+}
+function generateGroupCode() { return Math.random().toString(36).slice(2, 10); }
+function generatePlayerId()   { return 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function slotsToAvail(slots) {
+  const a = {};
+  Object.keys(slots || {}).forEach(k => {
+    const [di, h] = k.split('-').map(Number);
+    if (!a[di]) a[di] = [];
+    a[di].push(h);
+  });
+  return a;
+}
+
+// ─── Overlap engine ───────────────────────────────────────────────────────────
+function computeMatches(avail) {
+  const REQUIRED = 4, results = [];
+  DAYS.forEach((day, di) => {
+    const hMap = {};
+    Object.entries(avail).forEach(([pid, pAvail]) => {
+      (pAvail[di] || []).forEach(h => { if (!hMap[h]) hMap[h] = []; hMap[h].push(pid); });
+    });
+    const eligible = Object.entries(hMap)
+      .map(([h, ps]) => ({ h:+h, ps }))
+      .filter(e => e.ps.length >= REQUIRED)
+      .sort((a,b) => a.h - b.h);
+    let i = 0;
+    while (i < eligible.length) {
+      let win = [eligible[i]]; let j = i+1;
+      while (j < eligible.length && eligible[j].h === eligible[j-1].h+1) {
+        const common = eligible[j].ps.filter(p => win[win.length-1].ps.includes(p));
+        if (common.length < REQUIRED) break;
+        win.push({ h:eligible[j].h, ps:common }); j++;
+      }
+      const wp = win[win.length-1].ps;
+      results.push({
+        id:`${di}-${win[0].h}`, day, di,
+        start:win[0].h, end:win[0].h+win.length, durMins:win.length*60,
+        playerIds:wp, availCount:wp.length,
+        quality:win.length>=2?"Perfect":"Good",
+        score:win.length*20+Math.min(wp.length,8)*5,
+      });
+      i = j;
+    }
+  });
+  return results.sort((a,b) => b.score - a.score);
+}
+
+// ─── Smart parser ─────────────────────────────────────────────────────────────
+function parseAvailabilityQuery(query) {
+  const q = query.toLowerCase().trim();
+  const ALL = Array.from({length:16}, (_,i) => i+7);
+  const DAY_WORDS = { sunday:0,sun:0,monday:1,mon:1,tuesday:2,tue:2,tues:2,wednesday:3,wed:3,thursday:4,thu:4,thurs:4,friday:5,fri:5,saturday:6,sat:6 };
+  const DAY_GROUPS = [
+    { keys:["every day","everyday","all week","daily","whole week"], days:[0,1,2,3,4,5,6] },
+    { keys:["weekday","weekdays","work day","workday"],              days:[0,1,2,3,4] },
+    { keys:["weekend","weekends","all weekend"],                     days:[5,6] },
+  ];
+  const HOUR_WORDS = {
+    "early morning":[7,8],"morning":[7,8,9,10,11],"mornings":[7,8,9,10,11],
+    "noon":[12,13],"lunch":[12,13],"afternoon":[12,13,14,15,16,17],"afternoons":[12,13,14,15,16,17],
+    "evening":[17,18,19,20,21],"evenings":[17,18,19,20,21],"night":[20,21],"nights":[20,21],
+    "all day":ALL,"whole day":ALL,"anytime":ALL,
+  };
+  const days = new Set(), hours = new Set();
+  for (const grp of DAY_GROUPS) if (grp.keys.some(k=>q.includes(k))) grp.days.forEach(d=>days.add(d));
+  for (const [w,i] of Object.entries(DAY_WORDS)) if (new RegExp(`\\b${w}\\b`).test(q)) days.add(i);
+  for (const key of Object.keys(HOUR_WORDS).sort((a,b)=>b.length-a.length)) if (q.includes(key)) HOUR_WORDS[key].forEach(h=>hours.add(h));
+  const rangeRe = /(\d{1,2})(?::00)?\s*(?:pm|am)?\s*[-–to]+\s*(\d{1,2})(?::00)?\s*(?:pm|am)?/g;
+  let m;
+  while ((m = rangeRe.exec(q)) !== null) {
+    let [,s,e] = m; let st=+s, en=+e;
+    if (q.includes("pm")&&st<12) st+=12;
+    if (q.includes("pm")&&en<12) en+=12;
+    if (st<7&&!q.includes("am")) st+=12;
+    for (let h=st;h<Math.min(en,23);h++) hours.add(h);
+  }
+  const dArr=[...days].sort((a,b)=>a-b), hArr=[...hours].sort((a,b)=>a-b);
+  if (dArr.length&&!hArr.length) return {days:dArr,hours:ALL};
+  if (!dArr.length&&hArr.length) return {days:[0,1,2,3,4,5,6],hours:hArr};
+  return {days:dArr,hours:hArr};
+}
+
+// ─── Shared atoms ─────────────────────────────────────────────────────────────
+function Avatar({ p, size="md", showMe=false }) {
+  const sz = { sm:"w-8 h-8 text-[10px]", md:"w-10 h-10 text-xs", lg:"w-12 h-12 text-sm" }[size];
+  const n  = p.name||"?";
+  const ini = (n[0]||"?").toUpperCase()+(n[1]||"").toUpperCase();
+  return (
+    <div className={`${sz} rounded-full flex items-center justify-center font-bold flex-shrink-0 relative`}
+      style={{background:p.color+"22", border:`2px solid ${p.color}`, color:p.color}}>
+      {ini}
+      {showMe && <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white" style={{background:BLUE}}/>}
+    </div>
+  );
+}
+function RatingBadge({ rating }) {
+  const color = rating>=5?"#dc2626":rating>=3?BLUE:"#059669";
+  const label = RATING_LABEL[Math.round(rating*2)/2]||"";
+  return (
+    <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+      style={{background:color+"18",color}}>
+      {rating.toFixed(1)}{label?` · ${label}`:""}
+    </span>
+  );
+}
+function Pill({ label, active, onClick }) {
+  return (
+    <button onClick={onClick} className="flex-1 py-2.5 rounded-xl text-sm font-bold border"
+      style={active?{background:BLUE,color:"#fff",borderColor:BLUE}:{background:SURF,color:TXT2,borderColor:BORD}}>
+      {label}
+    </button>
+  );
+}
+function RatingInput({ rating, setRating }) {
+  const [raw, setRaw] = React.useState(rating.toFixed(1));
+  React.useEffect(() => { setRaw(rating.toFixed(1)); }, [rating]);
+  const color = rating>=5?"#dc2626":rating>=3?BLUE:"#059669";
+  const label = RATING_LABEL[Math.round(rating*2)/2]||"";
+  const commit = val => {
+    const v = parseFloat(val);
+    const c = isNaN(v)?1.0:Math.min(7.0,Math.max(1.0,Math.round(v*10)/10));
+    setRating(c); setRaw(c.toFixed(1));
+  };
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[11px] uppercase tracking-widest font-bold" style={{color:TXT2}}>Padel Rating</p>
+        {label && <span className="text-xs font-semibold" style={{color}}>{label}</span>}
+      </div>
+      <input type="number" min="1.0" max="7.0" step="0.1" value={raw}
+        onChange={e => { setRaw(e.target.value); const v=parseFloat(e.target.value); if(!isNaN(v)&&v>=1&&v<=7) setRating(Math.round(v*10)/10); }}
+        onBlur={e=>commit(e.target.value)}
+        onKeyDown={e=>e.key==="Enter"&&commit(e.target.value)}
+        className="w-full px-4 py-3 rounded-xl text-center text-2xl font-black border"
+        style={{background:SURF,borderColor:color+"55",color}}
+      />
+      <p className="text-[10px] mt-1.5" style={{color:TXT3}}>Range 1.0–7.0 · Official WPT / FIP Rating Scale</p>
+    </div>
+  );
+}
+
+// ─── TopBar ───────────────────────────────────────────────────────────────────
+function TopBar({ groupName, bookedCount }) {
+  return (
+    <header className="sticky top-0 z-20 bg-white border-b" style={{borderColor:BORD,boxShadow:"0 1px 4px rgba(30,64,175,0.07)"}}>
+      <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black text-white" style={{background:BLUE}}>P</div>
+          <div>
+            <span className="font-black text-base leading-tight block" style={{color:TXT}}>PadelMeet</span>
+            {groupName && <span className="text-[11px] leading-none block" style={{color:TXT3}}>{groupName}</span>}
+          </div>
+        </div>
+        <div className="relative w-9 h-9 rounded-full flex items-center justify-center" style={{background:"#f1f5f9"}}>
+          <Bell size={16} color={TXT2}/>
+          {bookedCount>0 && <div className="absolute top-1 right-1 w-2 h-2 rounded-full border-2 border-white" style={{background:BLUE}}/>}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+// ─── BottomNav ────────────────────────────────────────────────────────────────
+function BottomNav({ screen, setScreen }) {
+  const NAV = [
+    { id:"dashboard",    Icon:Zap,         label:"Home"     },
+    { id:"availability", Icon:CalendarIcon, label:"Schedule" },
+    { id:"preferences",  Icon:SettingsIcon, label:"Settings" },
+  ];
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t safe-bottom" style={{borderColor:BORD,zIndex:20}}>
+      <div className="max-w-2xl mx-auto flex justify-around py-1.5 pb-2">
+        {NAV.map(({ id, Icon, label }) => {
+          const active = screen===id;
+          return (
+            <button key={id} onClick={()=>setScreen(id)}
+              className="flex flex-col items-center gap-0.5 py-1.5 px-6 rounded-xl"
+              style={active?{background:BLUE+"12"}:{}}>
+              <Icon size={20} color={active?BLUE:TXT3} sw={active?2.5:1.5}/>
+              <span className="text-[10px] font-bold" style={{color:active?BLUE:TXT3}}>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+// ─── WeekNav ──────────────────────────────────────────────────────────────────
+function WeekNav({ weekOffset, setWeekOffset }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 bg-white border-b" style={{borderColor:BORD}}>
+      <button onClick={()=>setWeekOffset(w=>w-1)}
+        className="w-9 h-9 rounded-full flex items-center justify-center border" style={{background:"#f8fafc",borderColor:BORD}}>
+        <ChevronLeft size={16} color={TXT2}/>
+      </button>
+      <div className="flex-1 text-center">
+        <p className="font-black text-sm" style={{color:TXT}}>{getWeekLabel(weekOffset)}</p>
+        <p className="text-[11px]" style={{color:TXT3}}>{getWeekDateRange(weekOffset)}</p>
+      </div>
+      <button onClick={()=>setWeekOffset(w=>w+1)}
+        className="w-9 h-9 rounded-full flex items-center justify-center border" style={{background:"#f8fafc",borderColor:BORD}}>
+        <ChevronRight size={16} color={TXT2}/>
+      </button>
+      {weekOffset!==0 && (
+        <button onClick={()=>setWeekOffset(0)}
+          className="px-3 py-1.5 rounded-lg text-[11px] font-bold border" style={{background:BLUE+"12",color:BLUE,borderColor:BLUE+"33"}}>
+          Today
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Card / Section helpers ───────────────────────────────────────────────────
+const Card = ({ children, className="", style={} }) => (
+  <div className={`bg-white rounded-2xl ${className}`}
+    style={{border:`1px solid ${BORD}`,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",...style}}>
+    {children}
+  </div>
+);
+const SectionLabel = ({ children }) => (
+  <p className="text-[11px] uppercase tracking-widest font-bold mb-2.5" style={{color:TXT3}}>{children}</p>
+);
+
+// ─── SCREEN: Setup ────────────────────────────────────────────────────────────
+function SetupScreen() {
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-6 flex flex-col gap-4">
+      <div className="text-center py-4">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-3 text-white font-black" style={{background:BLUE}}>🎾</div>
+        <h1 className="text-2xl font-black" style={{color:TXT}}>PadelMeet</h1>
+        <p className="text-sm mt-1" style={{color:TXT2}}>One-time Firebase setup to enable live collaboration</p>
+      </div>
+      <Card className="p-4">
+        <p className="font-bold mb-3 text-sm" style={{color:BLUE}}>🔧 Firebase Setup — free, ~5 min</p>
+        <div className="flex flex-col gap-2.5 text-sm leading-relaxed" style={{color:TXT2}}>
+          {[
+            ["1","Go to console.firebase.google.com"],
+            ["2","Create a project → Add Web App → copy firebaseConfig"],
+            ["3","Build → Realtime Database → Create → Start in test mode"],
+            ["4","Open PadelMeet.html in a text editor, paste config at the top"],
+            ["5","Drag file to netlify.com/drop → share the URL! 🚀"],
+          ].map(([n,t])=>(
+            <p key={n}><span className="font-bold" style={{color:TXT}}>{n}.</span> {t}</p>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ─── SCREEN: Onboarding ───────────────────────────────────────────────────────
+function OnboardingScreen({ onCreate, onJoinCode }) {
+  const [code, setCode]       = React.useState('');
+  const [showJoin, setShowJoin] = React.useState(false);
+  return (
+    <div className="max-w-md mx-auto px-4 py-10 flex flex-col items-center gap-6">
+      <div className="text-center">
+        <div className="w-24 h-24 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-5 text-white" style={{background:BLUE}}>🎾</div>
+        <h1 className="text-4xl font-black" style={{color:TXT}}>PadelMeet</h1>
+        <p className="mt-3 leading-relaxed" style={{color:TXT2}}>
+          Coordinate padel with your crew.<br/>Share a link, everyone sets their free time,<br/>find the perfect window instantly.
+        </p>
+      </div>
+      <div className="w-full flex flex-col gap-3 mt-2">
+        <button onClick={onCreate}
+          className="w-full py-4 rounded-2xl text-base font-black text-white"
+          style={{background:BLUE}}>
+          Create New Group
+        </button>
+        {!showJoin ? (
+          <button onClick={()=>setShowJoin(true)}
+            className="w-full py-4 rounded-2xl text-base font-bold border"
+            style={{background:SURF,color:TXT2,borderColor:BORD}}>
+            Join with Invite Code
+          </button>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-center" style={{color:TXT3}}>Paste the code your friend shared</p>
+            <div className="flex gap-2">
+              <input value={code} onChange={e=>setCode(e.target.value.toLowerCase().replace(/\s/g,''))}
+                onKeyDown={e=>e.key==='Enter'&&code&&onJoinCode(code)}
+                placeholder="e.g. x7k2m9ab" autoFocus
+                className="flex-1 px-3.5 py-3 rounded-xl text-sm font-mono tracking-widest border"
+                style={{background:SURF,borderColor:BLUE+"55",color:TXT}}
+              />
+              <button onClick={()=>code&&onJoinCode(code)}
+                className="px-5 rounded-xl font-black text-sm text-white flex-shrink-0"
+                style={{background:BLUE}}>Join</button>
+            </div>
+          </div>
+        )}
+      </div>
+      <p className="text-xs text-center" style={{color:TXT3}}>Got a link? Just open it directly — no code needed.</p>
+    </div>
+  );
+}
+
+// ─── SCREEN: Join Group ───────────────────────────────────────────────────────
+function JoinGroupScreen({ groupId, existingCount, onJoin }) {
+  const isCreator = existingCount===0;
+  const [groupName, setGroupName] = React.useState('');
+  const [name,      setName]      = React.useState('');
+  const [rating,    setRating]    = React.useState(3.0);
+  const canSubmit = name.trim() && (!isCreator || groupName.trim());
+  const doJoin = () => { if (canSubmit) onJoin({ name:name.trim(), rating, groupName:groupName.trim() }); };
+  return (
+    <div className="max-w-md mx-auto px-4 py-8 flex flex-col gap-5">
+      <div className="text-center">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-3 text-white" style={{background:BLUE}}>🎾</div>
+        <h1 className="text-xl font-black" style={{color:TXT}}>{isCreator?"Create Your Group":"Join the Group"}</h1>
+        <p className="text-sm mt-1" style={{color:TXT2}}>
+          {isCreator?"You'll be the first — invite friends after!":`${existingCount} player${existingCount!==1?'s':''} already in this group`}
+        </p>
+        <p className="text-[10px] mt-1 font-mono" style={{color:TXT3}}>#{groupId}</p>
+      </div>
+      {isCreator && (
+        <div>
+          <p className="text-[11px] uppercase tracking-widest font-bold mb-2" style={{color:TXT2}}>
+            Group Name <span style={{color:"#dc2626"}}>*</span>
+          </p>
+          <input value={groupName} onChange={e=>setGroupName(e.target.value)} autoFocus maxLength={30}
+            placeholder='e.g. Thursday Crew, Los Padelistas…'
+            className="w-full px-4 py-3.5 rounded-xl text-sm border"
+            style={{background:SURF,borderColor:groupName.trim()?BORD:BLUE+"55",color:TXT}}
+          />
+          {!groupName.trim()&&<p className="text-[10px] mt-1" style={{color:"#dc2626"}}>Required — helps you identify this group later</p>}
+        </div>
+      )}
+      <div>
+        <p className="text-[11px] uppercase tracking-widest font-bold mb-2" style={{color:TXT2}}>Your Name</p>
+        <input id="playerNameInput" value={name} onChange={e=>setName(e.target.value)}
+          onKeyDown={e=>e.key==='Enter'&&doJoin()} placeholder="How should we call you?"
+          autoFocus={!isCreator} maxLength={20}
+          className="w-full px-4 py-3.5 rounded-xl text-sm border"
+          style={{background:SURF,borderColor:BLUE+"66",color:TXT}}
+        />
+      </div>
+      <RatingInput rating={rating} setRating={setRating}/>
+      <button onClick={doJoin} disabled={!canSubmit}
+        className="w-full py-4 rounded-2xl text-base font-black text-white"
+        style={{background:canSubmit?BLUE:"#94a3b8"}}>
+        {isCreator?"Create Group 🎾":"Join Group 🎾"}
+      </button>
+    </div>
+  );
+}
+
+// ─── Weekly Padel Tip Widget ─────────────────────────────────────────────────
+function PadelTipWidget({ mySlotCount, onGoSchedule }) {
+  const activeTip = padelTips[getCurrentWeekNumber() % padelTips.length];
+  const isLocked  = mySlotCount === 0;
+
+  return (
+    <Card className="overflow-hidden p-0">
+
+      {/* ── Header ── */}
+      <div className="px-4 py-3.5 flex items-center gap-3"
+        style={{background:`linear-gradient(135deg,${BLUE}08,${BLUE}18)`}}>
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+          style={{background:BLUE+"18"}}>🎯</div>
+        <p className="text-sm font-black leading-snug" style={{color:TXT}}>{activeTip.title}</p>
+      </div>
+
+      {/* ── Body ── */}
+      <div className="px-4 py-5 flex flex-col items-center gap-4">
+
+        {isLocked ? (
+          /* ── Locked ── */
+          <>
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-4xl"
+              style={{background:"#f1f5f9"}}>🔒</div>
+            <p className="text-sm font-bold text-center" style={{color:TXT}}>הטיפ השבועי חסום!</p>
+            <p className="text-xs text-center leading-relaxed" style={{color:TXT2}}>
+              עדכן את הזמינות שלך בלו&quot;ז כדי לפתוח את הסרטון.
+            </p>
+            <button onClick={onGoSchedule}
+              className="w-full py-3 rounded-xl text-sm font-black text-white"
+              style={{background:BLUE}}>
+              📅 עדכן זמינות
+            </button>
+          </>
+        ) : (
+          /* ── Unlocked ── */
+          <>
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-4xl"
+              style={{background:"#dcfce7"}}>📺</div>
+            <p className="text-sm text-center leading-relaxed" style={{color:TXT2}}>
+              הסרטון השבועי שלך מוכן לצפייה — לחץ על הכפתור למטה.
+            </p>
+            <a href={activeTip.url} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-black text-white"
+              style={{background:"#FF0000",boxShadow:"0 2px 10px rgba(255,0,0,0.30)"}}>
+              📺 צפה בהדרכה ביוטיוב
+            </a>
+          </>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+// ─── SCREEN: Dashboard ────────────────────────────────────────────────────────
+function Dashboard({ matches, players, myPlayerId, bookedMatches, groupId, groupName, onUpdateGroupName, isAdmin, onDeletePlayer, onPick, onGoSchedule, myGroups, onSwitchGroup, onCreateGroup, groupCourt, groupUrl, favGroupId }) {
+  const [copied,         setCopied]         = React.useState(false);
+  const [editingGrpName, setEditingGrpName] = React.useState(false);
+  const [grpNameInput,   setGrpNameInput]   = React.useState(groupName);
+  const ready = players.filter(p=>p.filled).length;
+  React.useEffect(()=>{ setGrpNameInput(groupName); }, [groupName]);
+  const commitGroupName = () => {
+    const t = grpNameInput.trim();
+    if (t) onUpdateGroupName(t); else setGrpNameInput(groupName);
+    setEditingGrpName(false);
+  };
+  const shareGroup = () => {
+    const url = `${window.location.origin}${window.location.pathname}?group=${groupId}`;
+    if (navigator.clipboard) navigator.clipboard.writeText(url).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2500); }).catch(()=>prompt("Invite link:",url));
+    else prompt("Invite link:",url);
+  };
+
+  return (
+    <div className="flex flex-col gap-4 pb-4">
+      <div className="pt-4">
+        <p className="text-sm" style={{color:TXT2}}>Good to see you,</p>
+        <h1 className="text-2xl font-black" style={{color:TXT}}>Let's play Padel 🎾</h1>
+      </div>
+
+      {/* My Groups switcher */}
+      {myGroups.length > 0 && (
+        <div>
+          <SectionLabel>My Groups</SectionLabel>
+          <div className="flex gap-2 overflow-x-auto pb-1" style={{scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+            {myGroups.map(g => (
+              <button key={g.id} onClick={()=>onSwitchGroup(g.id)}
+                className="flex-shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border whitespace-nowrap"
+                style={g.id===groupId
+                  ? {background:BLUE,color:"#fff",borderColor:BLUE}
+                  : {background:SURF,color:TXT2,borderColor:BORD}}>
+                {g.name||`#${g.id.slice(0,6)}`}
+                {g.id===favGroupId && <span className="ml-1" style={{opacity:0.85}}>⭐</span>}
+              </button>
+            ))}
+            <button onClick={onCreateGroup}
+              className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center border"
+              style={{background:SURF,borderColor:BORD}} title="Create new group">
+              <Plus size={14} color={TXT3}/>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Group status */}
+      <Card className="p-4" style={{background:`linear-gradient(135deg,${BLUE}08,${BLUE}14)`,borderColor:BLUE+"22"}}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1.5 flex-1 min-w-0 mr-2">
+            {isAdmin&&editingGrpName?(
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                <input value={grpNameInput} onChange={e=>setGrpNameInput(e.target.value)}
+                  onKeyDown={e=>{if(e.key==='Enter')commitGroupName();if(e.key==='Escape'){setGrpNameInput(groupName);setEditingGrpName(false);}}}
+                  autoFocus maxLength={30}
+                  className="flex-1 bg-transparent text-sm font-black min-w-0 border-b"
+                  style={{color:BLUE,borderColor:BLUE+"55"}}/>
+                <button onClick={commitGroupName}
+                  className="px-2 py-0.5 rounded-md text-[10px] font-black flex-shrink-0 text-white" style={{background:BLUE}}>Save</button>
+                <button onClick={()=>{setGrpNameInput(groupName);setEditingGrpName(false);}}><X size={13} color={TXT3}/></button>
+              </div>
+            ):(
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-sm font-black truncate" style={{color:BLUE}}>{groupName||"My Padel Group"}</span>
+                {isAdmin&&<button onClick={()=>{setGrpNameInput(groupName);setEditingGrpName(true);}}><Pencil size={11} color={BLUE+"99"}/></button>}
+              </div>
+            )}
+          </div>
+          <button onClick={shareGroup}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold flex-shrink-0 border"
+            style={copied?{background:BLUE,color:"#fff",borderColor:BLUE}:{background:SURF,color:BLUE,borderColor:BLUE+"33"}}>
+            {copied?<><Check size={12} color="#fff"/> Copied!</>:<><ShareIcon size={12} color={BLUE}/> Invite</>}
+          </button>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {players.map(p=>(
+            <div key={p.id} className="flex flex-col items-center gap-1">
+              <Avatar p={p} size="sm" showMe={p.isMe}/>
+              <div className="w-1.5 h-1.5 rounded-full" style={{background:p.filled?BLUE:BORD}}/>
+            </div>
+          ))}
+          <div className="flex flex-col items-center gap-1">
+            <div className="w-8 h-8 rounded-full border-2 border-dashed flex items-center justify-center" style={{borderColor:BORD}}>
+              <Plus size={11} color={TXT3}/>
+            </div>
+            <div className="w-1.5 h-1.5 rounded-full" style={{background:BORD}}/>
+          </div>
+        </div>
+        <p className="text-xs mt-2.5" style={{color:TXT2}}>
+          <span className="font-bold" style={{color:BLUE}}>{ready}/{players.length||"–"}</span> players submitted availability
+          {players.length>=4&&ready>=4&&<span style={{color:TXT3}}> · enough to find matches!</span>}
+        </p>
+      </Card>
+
+      {/* Favorite Court banner */}
+      {groupCourt&&(
+        <Card className="p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{background:BLUE+"12"}}>
+                <MapPin size={17} color={BLUE}/>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-widest font-bold" style={{color:TXT3}}>Playing this week at</p>
+                <p className="text-sm font-bold truncate" style={{color:TXT}}>{groupCourt}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(groupCourt)}`}
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border"
+                style={{background:SURF,color:BLUE,borderColor:BLUE+"33"}}>
+                <MapPin size={11} color={BLUE}/> Maps
+              </a>
+              <a href={`https://waze.com/ul?q=${encodeURIComponent(groupCourt)}&navigate=yes`}
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border"
+                style={{background:"#00b8d412",color:"#00b8d4",borderColor:"#00b8d433"}}>
+                Waze
+              </a>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Booked matches / empty state */}
+      {bookedMatches.length>0?(
+        <div>
+          <SectionLabel>Booked Matches</SectionLabel>
+          <div className="flex flex-col gap-2">
+            {bookedMatches.map(m=>(
+              <Card key={m.id} className="p-4" style={{background:`${BLUE}08`,borderColor:`${BLUE}33`}}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <CheckCircle size={14} color={BLUE}/>
+                      <span className="font-bold text-sm" style={{color:TXT}}>Confirmed</span>
+                    </div>
+                    <p className="text-sm font-medium" style={{color:TXT}}>{m.day} · {m.start}:00–{m.end}:00</p>
+                    <p className="text-xs mt-0.5" style={{color:TXT2}}>{m.court||"Court TBD"}</p>
+                  </div>
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background:BLUE}}>{m.durMins}m</span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-3">
+                  {(m.playerIds||[]).map(pid=>{const p=players.find(pl=>pl.id===pid);return p?<Avatar key={pid} p={p} size="sm"/>:null;})}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ):(
+        <Card className="p-6 flex flex-col items-center text-center">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3 text-2xl" style={{background:BLUE+"12"}}>🎾</div>
+          <p className="font-bold text-sm" style={{color:TXT}}>No matches booked yet</p>
+          <p className="text-xs mt-1 leading-relaxed" style={{color:TXT2}}>Set your availability to find open windows with your group</p>
+          <button onClick={onGoSchedule}
+            className="mt-4 px-5 py-2.5 rounded-xl text-sm font-black text-white" style={{background:BLUE}}>
+            Set My Availability
+          </button>
+        </Card>
+      )}
+
+      {/* Suggested windows */}
+      <div>
+        <div className="flex items-center justify-between mb-2.5">
+          <SectionLabel>Suggested Windows</SectionLabel>
+          <span className="text-[11px]" style={{color:TXT3}}>{matches.length} found</span>
+        </div>
+        {matches.length===0?(
+          <Card className="p-4 text-center">
+            <p className="text-sm" style={{color:TXT2}}>No overlaps found yet.</p>
+            <p className="text-xs mt-1" style={{color:TXT3}}>
+              {players.filter(p=>p.filled).length<4
+                ?`Need ${4-players.filter(p=>p.filled).length} more players to set availability.`
+                :"No 4-player slots overlap yet — try adding more availability."}
+            </p>
+          </Card>
+        ):(
+          <div className="flex flex-col gap-2">
+            {matches.slice(0,5).map((m,idx)=>{
+              const booked = bookedMatches.some(b=>b.id===m.id);
+              return (
+                <button key={m.id} onClick={()=>!booked&&onPick(m)} disabled={booked}
+                  className="w-full text-left rounded-2xl p-3.5 flex items-center gap-3 bg-white border"
+                  style={{borderColor:idx===0&&!booked?BLUE+"44":BORD,boxShadow:"0 1px 3px rgba(0,0,0,0.05)",opacity:booked?0.5:1}}>
+                  <div className="w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0"
+                    style={{background:idx===0&&!booked?BLUE+"15":BG}}>
+                    <span className="text-[11px] font-black" style={{color:idx===0&&!booked?BLUE:TXT3}}>{m.day.slice(0,3).toUpperCase()}</span>
+                    <span className="text-[10px]" style={{color:idx===0&&!booked?BLUE+"aa":TXT3}}>{m.start}h</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold" style={{color:TXT}}>{m.day} · {m.start}:00–{m.end}:00</p>
+                    <div className="flex items-center gap-1 mt-1">
+                      {(m.playerIds||[]).slice(0,4).map(pid=>{
+                        const p=players.find(pl=>pl.id===pid);
+                        return p?<div key={pid} className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold" style={{background:p.color+"22",color:p.color}}>{(p.name||"?")[0]}</div>:null;
+                      })}
+                      {(m.availCount||0)>4&&<span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{background:"#f1f5f9",color:TXT3}}>+{m.availCount-4}</span>}
+                      <span className="text-[10px] ml-0.5" style={{color:TXT3}}>{m.durMins}m</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {booked?(
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border" style={{color:TXT3,borderColor:BORD}}>Booked</span>
+                    ):(<>
+                      {(m.availCount||0)>4&&<span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{background:"#ede9fe",color:"#7c3aed"}}>{m.availCount} free</span>}
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={m.quality==="Perfect"?{background:BLUE+"18",color:BLUE}:{background:"#fef9c3",color:"#a16207"}}>{m.quality}</span>
+                      <ChevronRight size={15} color={TXT3}/>
+                    </>)}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Group roster */}
+      <div>
+        <div className="flex items-center justify-between mb-2.5">
+          <SectionLabel>Your Group</SectionLabel>
+          {isAdmin&&(()=>{
+            const lagging = players.filter(p=>p.slotCount===0);
+            if (!lagging.length) return null;
+            const msg = `🚨 *Weekly Padel Nudge!* 🚨\n\nCome on guys, everyone updated their availability except for you. Click the link and mark your slots now!\n\nPlayers who haven't submitted yet:\n${lagging.map(p=>`• ${p.name}`).join('\n')}\n\n👉 ${groupUrl}`;
+            return (
+              <a href={`https://wa.me/?text=${encodeURIComponent(msg)}`} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border flex-shrink-0"
+                style={{background:"#25D36612",color:"#25D366",borderColor:"#25D36633"}}>
+                <span style={{fontSize:13}}>💬</span> Nudge ({lagging.length})
+              </a>
+            );
+          })()}
+        </div>
+        <div className="flex flex-col gap-2">
+          {players.map(p=>(
+            <Card key={p.id} className="flex items-center justify-between px-4 py-3"
+              style={p.isMe?{background:BLUE+"08",borderColor:BLUE+"33"}:{}}>
+              <div className="flex items-center gap-3">
+                <Avatar p={p}/>
+                <div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-sm font-semibold" style={{color:TXT}}>{p.name}</p>
+                    {p.isMe&&<span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold text-white" style={{background:BLUE}}>You</span>}
+                    <span className="text-[10px]" style={{color:p.slotCount===0?"#f97316":TXT3}}>
+                      {p.slotCount} slot{p.slotCount!==1?"s":""}
+                    </span>
+                  </div>
+                  <RatingBadge rating={p.rating}/>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {p.filled
+                  ?<span className="flex items-center gap-1 text-[11px] font-semibold" style={{color:BLUE}}><CheckCircle size={13} color={BLUE}/> Ready</span>
+                  :<span className="flex items-center gap-1 text-[11px]" style={{color:TXT3}}><CircleIcon size={13} color={TXT3}/> Pending</span>}
+                {isAdmin&&!p.isMe&&(
+                  <button onClick={()=>onDeletePlayer(p.id)}
+                    className="w-6 h-6 rounded-full flex items-center justify-center border flex-shrink-0"
+                    style={{background:"#fff0f0",borderColor:"#fecaca"}}
+                    title="Remove player">
+                    <X size={11} color="#dc2626"/>
+                  </button>
+                )}
+              </div>
+            </Card>
+          ))}
+          {players.length===0&&<p className="text-center text-sm py-4" style={{color:TXT3}}>No one here yet — invite your friends!</p>}
+        </div>
+      </div>
+
+      {/* Weekly Padel Tip */}
+      <PadelTipWidget
+        mySlotCount={players.find(p=>p.isMe)?.slotCount??0}
+        onGoSchedule={onGoSchedule}/>
+    </div>
+  );
+}
+
+// ─── SCREEN: Availability ─────────────────────────────────────────────────────
+function Availability({ mySlots, setMySlots, groupPlayers, weekKey, weekOffset, setWeekOffset }) {
+  const [mode, setMode] = React.useState("me");
+  const [smartQuery, setSmartQuery] = React.useState('');
+  const [smartFeedback, setSmartFeedback] = React.useState('');
+  const fbTimer = React.useRef(null);
+
+  const showFeedback = msg => { clearTimeout(fbTimer.current); setSmartFeedback(msg); fbTimer.current=setTimeout(()=>setSmartFeedback(''),3500); };
+
+  const drag = React.useRef({ on:false, action:null, lastKey:'' });
+  const cellFromPoint = (x,y) => { const el=document.elementFromPoint(x,y); const di=el?.getAttribute('data-di'); const h=el?.getAttribute('data-h'); return(di!=null&&h!=null)?{di:+di,h:+h}:null; };
+  const paintCell = React.useCallback((di,h,action)=>{ const key=`${di}-${h}`; if(drag.current.lastKey===key)return; drag.current.lastKey=key; setMySlots(prev=>{const n={...prev};if(action==="add")n[key]=true;else delete n[key];return n;}); },[setMySlots]);
+  const onGridDown = e => { if(mode!=="me")return; e.preventDefault(); const cell=cellFromPoint(e.clientX,e.clientY); if(!cell)return; const action=mySlots[`${cell.di}-${cell.h}`]?"remove":"add"; drag.current={on:true,action,lastKey:''}; paintCell(cell.di,cell.h,action); e.currentTarget.setPointerCapture?.(e.pointerId); };
+  const onGridMove = e => { if(!drag.current.on||mode!=="me")return; const cell=cellFromPoint(e.clientX,e.clientY); if(cell)paintCell(cell.di,cell.h,drag.current.action); };
+  const onGridUp   = () => { drag.current={on:false,action:null,lastKey:''}; };
+
+  const applyPreset = preset => setMySlots(prev=>{ const n={...prev}; preset.days.forEach(di=>preset.hours.forEach(h=>{n[`${di}-${h}`]=true;})); return n; });
+  const applySmartQuery = q => {
+    const txt=q.trim(); if(!txt)return;
+    const {days,hours}=parseAvailabilityQuery(txt);
+    if(!days.length||!hours.length){showFeedback('⚠ Not understood — try "Monday evening" or "all weekend".');return;}
+    setMySlots(prev=>{const n={...prev};days.forEach(di=>hours.forEach(h=>{n[`${di}-${h}`]=true;}));return n;});
+    showFeedback(`✓ Added ${days.map(d=>DAYS[d]).join(', ')} · ${Math.min(...hours)}:00–${Math.max(...hours)+1}:00`);
+    setSmartQuery('');
+  };
+  const clearAll = () => setMySlots({});
+
+  const groupCount = (di,h) => Object.values(groupPlayers).reduce((c,p)=>c+(p.weeks?.[weekKey]?.[`${di}-${h}`]?1:0),0);
+  const total = Object.keys(mySlots).length;
+
+  return (
+    <div className="flex flex-col gap-4 pb-4">
+      <div className="pt-4">
+        <h1 className="text-2xl font-black" style={{color:TXT}}>Availability</h1>
+        <p className="text-sm mt-0.5" style={{color:TXT2}}>Tap or drag to mark your free time</p>
+      </div>
+
+      {/* Week navigator */}
+      <Card className="overflow-hidden p-0">
+        <WeekNav weekOffset={weekOffset} setWeekOffset={setWeekOffset}/>
+        {/* My / Group toggle */}
+        <div className="flex gap-0.5 p-1.5 border-b" style={{borderColor:BORD}}>
+          {["me","group"].map(v=>(
+            <button key={v} onClick={()=>setMode(v)}
+              className="flex-1 py-2 text-sm font-bold rounded-lg"
+              style={mode===v?{background:BLUE,color:"#fff"}:{color:TXT2}}>
+              {v==="me"?"My Schedule":"Group Overlap"}
+            </button>
+          ))}
+        </div>
+
+        {/* Grid */}
+        <div className="p-3 select-none" style={{touchAction:"none",WebkitUserSelect:"none"}}
+          onPointerDown={onGridDown} onPointerMove={onGridMove}
+          onPointerUp={onGridUp} onPointerLeave={onGridUp} onPointerCancel={onGridUp}>
+
+          <div className="flex items-center mb-1 gap-px">
+            <div className="w-10 flex-shrink-0"/>
+            {DAYS.map(d=>(
+              <div key={d} className="flex-1 text-center text-[11px] font-bold py-1.5 rounded-sm"
+                style={{color:TXT2,background:"#f8fafc"}}>{d}</div>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-px">
+            {HOURS.map(h=>(
+              <div key={h} className="flex items-center gap-px">
+                <div className="w-10 flex-shrink-0 text-right pr-1.5 text-[9px]" style={{color:TXT3,pointerEvents:"none"}}>{h}:00</div>
+                {DAYS.map((_,di)=>{
+                  const isMine=!!mySlots[`${di}-${h}`];
+                  const gc=groupCount(di,h);
+                  let bg,border;
+                  if(mode==="group"){ const oc=OVERLAP_COLORS[Math.min(gc,4)]; bg=oc.bg; border=oc.border; }
+                  else if(isMine){ bg="#bef264"; border="#84cc16"; }
+                  else { bg="#f8fafc"; border="#e2e8f0"; }
+                  return (
+                    <div key={di} data-di={di} data-h={h}
+                      className="flex-1 h-6 rounded-sm"
+                      style={{background:bg,border:`1px solid ${border}`,cursor:mode==="me"?"crosshair":"default",touchAction:"none",pointerEvents:"all"}}
+                    />
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+
+          {/* Legend / save bar */}
+          {mode==="group"?(
+            <div className="mt-3">
+              <div className="flex items-center justify-between gap-1.5">
+                {[{label:"1",desc:"player",idx:1},{label:"2",desc:"players",idx:2},{label:"3",desc:"players",idx:3},{label:"4+",desc:"match!",idx:4}].map(({label,desc,idx})=>{
+                  const oc=OVERLAP_COLORS[idx];
+                  return(
+                    <div key={label} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl border"
+                      style={{background:oc.bg,borderColor:oc.border}}>
+                      <span className="text-[13px] font-black" style={{color:oc.text}}>{label}</span>
+                      <span className="text-[9px] font-semibold" style={{color:oc.text+"99"}}>{desc}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-center text-[9px] mt-1.5" style={{color:TXT3}}>players free during this slot</p>
+            </div>
+          ):(
+            <div className="mt-3 flex items-center justify-between">
+              <p className="text-xs" style={{color:TXT2}}>{total} slot{total!==1?"s":""} selected</p>
+              <div className="flex gap-2">
+                {total>0&&<button onClick={clearAll} className="px-3 py-1.5 rounded-xl text-xs font-bold border" style={{color:TXT2,borderColor:BORD}}>Clear all</button>}
+                <button className="px-4 py-1.5 rounded-xl text-sm font-black text-white" style={{background:BLUE,pointerEvents:"none"}}>✓ Auto-saved</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Smart Select */}
+      {mode==="me"&&(
+        <div>
+          <SectionLabel>Smart Select</SectionLabel>
+          <div className="flex gap-2 mb-2">
+            <input value={smartQuery} onChange={e=>setSmartQuery(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&applySmartQuery(smartQuery)}
+              placeholder='"Monday evening", "all weekend", "weekday mornings"…'
+              className="flex-1 px-3.5 py-2.5 rounded-xl text-sm border"
+              style={{background:SURF,borderColor:BLUE+"44",color:TXT}}
+            />
+            <button onClick={()=>applySmartQuery(smartQuery)} disabled={!smartQuery.trim()}
+              className="px-4 py-2.5 rounded-xl text-sm font-black flex-shrink-0 text-white"
+              style={{background:smartQuery.trim()?BLUE:"#94a3b8"}}>✓</button>
+          </div>
+          {smartFeedback&&<p className="text-[11px] font-semibold mb-2" style={{color:BLUE}}>{smartFeedback}</p>}
+          <div className="flex flex-wrap gap-1.5">
+            {QUICK_PRESETS.map(preset=>(
+              <button key={preset.label} onClick={()=>applyPreset(preset)}
+                className="px-3 py-1.5 rounded-lg text-[11px] font-semibold border active:scale-95 transition-transform"
+                style={{background:SURF,borderColor:BORD,color:TXT2}}>
+                {preset.label}
+                <span className="text-[9px] ml-1.5" style={{color:TXT3}}>{preset.sub}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── SCREEN: Settings ─────────────────────────────────────────────────────────
+function SettingsScreen({ userName,setUserName,userRating,setUserRating,groupName,setGroupName,courts,setCourts,preferredCourt,setPreferredCourt,duration,setDuration,notif,setNotif,myGroups,removeGroup,favGroupId,setFavGroupId,activeGroupId,onSwitchGroup }) {
+  const [editingName,    setEditingName]    = React.useState(false);
+  const [nameInput,      setNameInput]      = React.useState(userName);
+  const [editingGrpName, setEditingGrpName] = React.useState(false);
+  const [grpNameInput,   setGrpNameInput]   = React.useState(groupName);
+  const [addingCourt,    setAddingCourt]    = React.useState(false);
+  const [newCourtInput,  setNewCourtInput]  = React.useState('');
+  const [editCourtIdx,   setEditCourtIdx]   = React.useState(null);
+  const [editCourtInput, setEditCourtInput] = React.useState('');
+  const [flashSaved,     setFlashSaved]     = React.useState(false);
+
+  React.useEffect(()=>{ if(!editingGrpName) setGrpNameInput(groupName); },[groupName]);
+
+  const commitGroupName = () => { const t=grpNameInput.trim(); if(t)setGroupName(t);else setGrpNameInput(groupName); setEditingGrpName(false); };
+  const commitName      = () => { const t=nameInput.trim(); if(t)setUserName(t);else setNameInput(userName); setEditingName(false); };
+  const addCourt        = () => { const t=newCourtInput.trim(); if(!t)return; setCourts(p=>[...p,t]); setNewCourtInput(''); setAddingCourt(false); };
+  const deleteCourt     = idx => setCourts(p=>{ const next=p.filter((_,i)=>i!==idx); if(preferredCourt===p[idx])setPreferredCourt(next[0]||null); return next; });
+  const commitCourtEdit = () => { const t=editCourtInput.trim(); if(t) setCourts(p=>{ const old=p[editCourtIdx]; const next=p.map((c,i)=>i===editCourtIdx?t:c); if(preferredCourt===old)setPreferredCourt(t); return next; }); setEditCourtIdx(null); };
+  const save = () => { setFlashSaved(true); setTimeout(()=>setFlashSaved(false),2000); };
+
+  return (
+    <div className="flex flex-col gap-4 pb-4">
+      <div className="pt-4">
+        <h1 className="text-2xl font-black" style={{color:TXT}}>Settings</h1>
+        <p className="text-sm mt-0.5" style={{color:TXT2}}>Profile &amp; match preferences</p>
+      </div>
+
+      {/* Group name */}
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-2">
+          <SectionLabel>Group Name</SectionLabel>
+          {!editingGrpName&&<button onClick={()=>{setGrpNameInput(groupName);setEditingGrpName(true);}} className="flex items-center gap-1 text-[11px] font-bold" style={{color:BLUE}}><Pencil size={11} color={BLUE}/> Edit</button>}
+        </div>
+        {editingGrpName?(
+          <div className="flex items-center gap-2">
+            <input value={grpNameInput} onChange={e=>setGrpNameInput(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter")commitGroupName();if(e.key==="Escape"){setEditingGrpName(false);setGrpNameInput(groupName);}}}
+              autoFocus maxLength={30} placeholder="e.g. Thursday Crew"
+              className="flex-1 bg-transparent text-sm font-bold min-w-0 border-b" style={{color:TXT,borderColor:BLUE}}/>
+            <button onClick={commitGroupName} className="px-2.5 py-1 rounded-lg text-xs font-black flex-shrink-0 text-white" style={{background:BLUE}}>Save</button>
+            <button onClick={()=>{setEditingGrpName(false);setGrpNameInput(groupName);}}><X size={14} color={TXT3}/></button>
+          </div>
+        ):(
+          <p className="text-sm font-bold" style={{color:TXT}}>{groupName||<span style={{color:TXT3,fontWeight:400,fontStyle:"italic"}}>No name set</span>}</p>
+        )}
+      </Card>
+
+      {/* Profile */}
+      <Card className="p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 text-white" style={{background:BLUE}}>
+            {(userName[0]||"Y").toUpperCase()}{(userName[1]||"O").toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            {editingName?(
+              <div className="flex items-center gap-2">
+                <input value={nameInput} onChange={e=>setNameInput(e.target.value)}
+                  onKeyDown={e=>{if(e.key==="Enter")commitName();if(e.key==="Escape"){setEditingName(false);setNameInput(userName);}}}
+                  autoFocus maxLength={20}
+                  className="flex-1 bg-transparent text-sm font-bold min-w-0 border-b" style={{color:TXT,borderColor:BLUE}}/>
+                <button onClick={commitName} className="px-2.5 py-1 rounded-lg text-xs font-black text-white flex-shrink-0" style={{background:BLUE}}>Save</button>
+                <button onClick={()=>{setEditingName(false);setNameInput(userName);}}><X size={14} color={TXT3}/></button>
+              </div>
+            ):(
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm" style={{color:TXT}}>{userName}</span>
+                <button onClick={()=>{setEditingName(true);setNameInput(userName);}}><Pencil size={13} color={TXT3}/></button>
+              </div>
+            )}
+            <div className="mt-0.5"><RatingBadge rating={userRating}/></div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Padel Rating */}
+      <Card className="p-4">
+        <RatingInput rating={userRating} setRating={setUserRating}/>
+      </Card>
+
+      {/* Match Duration */}
+      <div>
+        <SectionLabel>Match Duration</SectionLabel>
+        <div className="flex gap-2">
+          {[60,90,120].map(d=><Pill key={d} label={`${d}m`} active={duration===d} onClick={()=>setDuration(d)}/>)}
+        </div>
+        <p className="text-[10px] mt-1.5" style={{color:TXT3}}>Padel is a 4-player game — group size is fixed.</p>
+      </div>
+
+      {/* Courts */}
+      <div>
+        <div className="flex items-center justify-between mb-2.5">
+          <SectionLabel>Padel Courts</SectionLabel>
+          {!addingCourt&&<button onClick={()=>setAddingCourt(true)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold border" style={{background:BLUE+"12",color:BLUE,borderColor:BLUE+"33"}}><Plus size={11} color={BLUE}/> Add Court</button>}
+        </div>
+        {addingCourt&&(
+          <div className="flex gap-2 mb-2.5">
+            <input value={newCourtInput} onChange={e=>setNewCourtInput(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter")addCourt();if(e.key==="Escape"){setAddingCourt(false);setNewCourtInput('');} }}
+              placeholder="Club or court name…" autoFocus
+              className="flex-1 px-3 py-2.5 rounded-xl text-sm border" style={{background:SURF,borderColor:BLUE+"55",color:TXT}}/>
+            <button onClick={addCourt} className="px-3.5 rounded-xl text-sm font-black text-white" style={{background:BLUE}}>Add</button>
+            <button onClick={()=>{setAddingCourt(false);setNewCourtInput('');}} className="px-3 rounded-xl border flex items-center" style={{background:SURF,borderColor:BORD}}><X size={14} color={TXT3}/></button>
+          </div>
+        )}
+        {courts.length===0&&!addingCourt&&<p className="text-xs text-center py-4" style={{color:TXT3}}>No courts added yet — tap "Add Court".</p>}
+        <div className="flex flex-col gap-1.5">
+          {courts.map((c,idx)=>(
+            <Card key={idx} className="flex items-center gap-2 px-3.5 py-3"
+              style={preferredCourt===c?{background:BLUE+"08",borderColor:BLUE+"33"}:{}}>
+              <button onClick={()=>setPreferredCourt(c)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left">
+                <MapPin size={13} color={preferredCourt===c?BLUE:TXT3}/>
+                {editCourtIdx===idx?(
+                  <input value={editCourtInput} onChange={e=>setEditCourtInput(e.target.value)}
+                    onKeyDown={e=>{if(e.key==="Enter")commitCourtEdit();if(e.key==="Escape")setEditCourtIdx(null);}}
+                    onBlur={commitCourtEdit} autoFocus
+                    className="flex-1 bg-transparent text-sm font-medium min-w-0 border-b" style={{color:TXT,borderColor:BLUE}}/>
+                ):(
+                  <span className="text-sm font-medium truncate" style={{color:preferredCourt===c?TXT:TXT2}}>{c}</span>
+                )}
+              </button>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {preferredCourt===c&&editCourtIdx!==idx&&<Check size={13} color={BLUE}/>}
+                <button onClick={()=>{setEditCourtIdx(idx);setEditCourtInput(c);}} className="w-7 h-7 rounded-lg flex items-center justify-center border" style={{background:"#f8fafc",borderColor:BORD}}><Pencil size={11} color={TXT3}/></button>
+                <button onClick={()=>deleteCourt(idx)} className="w-7 h-7 rounded-lg flex items-center justify-center border" style={{background:"#fff0f0",borderColor:"#fecaca"}}><Trash size={11} color="#dc2626"/></button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Notifications */}
+      <Card className="flex items-center justify-between px-4 py-3.5">
+        <div className="flex items-center gap-2.5">
+          <Bell size={15} color={notif?BLUE:TXT3}/>
+          <span className="text-sm font-medium" style={{color:TXT}}>Match Notifications</span>
+        </div>
+        <button onClick={()=>setNotif(n=>!n)}
+          className="w-11 h-6 rounded-full relative flex-shrink-0" style={{background:notif?BLUE:"#e2e8f0"}}>
+          <div className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow" style={{left:notif?"calc(100% - 22px)":"2px",transition:"left .15s"}}/>
+        </button>
+      </Card>
+
+      {/* My Saved Groups */}
+      <div>
+        <SectionLabel>My Saved Groups</SectionLabel>
+        {myGroups.length===0?(
+          <p className="text-xs text-center py-4" style={{color:TXT3}}>No saved groups yet — create or join one!</p>
+        ):(
+          <div className="flex flex-col gap-2">
+            {myGroups.map(g=>(
+              <Card key={g.id} className="flex items-center gap-3 px-4 py-3"
+                style={g.id===activeGroupId?{background:BLUE+"08",borderColor:BLUE+"33"}:{}}>
+                <button onClick={()=>onSwitchGroup(g.id)} className="flex-1 text-left min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-semibold truncate" style={{color:TXT}}>{g.name||`#${g.id.slice(0,6)}`}</p>
+                    {g.id===activeGroupId&&<span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold text-white flex-shrink-0" style={{background:BLUE}}>Active</span>}
+                    {g.isAdmin&&<span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold flex-shrink-0" style={{background:BLUE+"18",color:BLUE}}>Admin</span>}
+                  </div>
+                  <p className="text-[10px] font-mono mt-0.5" style={{color:TXT3}}>#{g.id}</p>
+                </button>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <button onClick={()=>{
+                    const newFav = favGroupId===g.id ? null : g.id;
+                    setFavGroupId(newFav);
+                    // Hard redirect guarantees Firebase re-attaches and dashboard reloads cleanly
+                    if (newFav && newFav!==activeGroupId) {
+                      window.location.href = window.location.origin + window.location.pathname + '?group=' + newFav;
+                    }
+                  }}
+                    className="w-8 h-8 rounded-xl flex items-center justify-center border"
+                    style={favGroupId===g.id?{background:"#fef9c3",borderColor:"#fbbf24"}:{background:"#f8fafc",borderColor:BORD}}
+                    title={favGroupId===g.id?"Remove favourite":"Set as favourite & switch now"}>
+                    <span style={{fontSize:15,lineHeight:1}}>{favGroupId===g.id?"⭐":"☆"}</span>
+                  </button>
+                  {g.id!==activeGroupId&&(
+                    <button onClick={()=>removeGroup(g.id)}
+                      className="w-8 h-8 rounded-xl flex items-center justify-center border"
+                      style={{background:"#fff0f0",borderColor:"#fecaca"}}
+                      title="Remove from saved groups">
+                      <Trash size={12} color="#dc2626"/>
+                    </button>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+        {favGroupId&&<p className="text-[10px] mt-1.5 text-center" style={{color:TXT3}}>⭐ Starred group opens automatically when you launch the app</p>}
+      </div>
+
+      <button onClick={save}
+        className="w-full py-4 rounded-2xl text-base font-black text-white flex items-center justify-center gap-2"
+        style={{background:BLUE}}>
+        {flashSaved?<><Check size={18} color="#fff"/> Saved!</>:"Save Settings"}
+      </button>
+    </div>
+  );
+}
+
+// ─── SCREEN: Match Detail ─────────────────────────────────────────────────────
+function MatchDetail({ match, players, courts, preferredCourt, onBack, onBook, onSchedule }) {
+  const [booked, setBooked]           = React.useState(false);
+  const [selectedCourt, setSelected]  = React.useState(preferredCourt||courts[0]||null);
+  const matchPlayers = (match.playerIds||[]).map(pid=>players.find(p=>p.id===pid)).filter(Boolean);
+
+  const book = () => { setBooked(true); onBook({...match,court:selectedCourt}); setTimeout(onBack,1500); };
+
+  return (
+    <div className="flex flex-col gap-4 pb-8">
+      <div className="pt-4 flex items-center gap-3">
+        <button onClick={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center border" style={{background:SURF,borderColor:BORD}}>
+          <ArrowLeft size={17} color={TXT}/>
+        </button>
+        <h1 className="text-lg font-black" style={{color:TXT}}>Match Details</h1>
+        <div className="ml-auto px-2.5 py-1 rounded-full text-[11px] font-bold" style={match.quality==="Perfect"?{background:BLUE+"18",color:BLUE}:{background:"#fef9c3",color:"#a16207"}}>{match.quality}</div>
+      </div>
+
+      <Card className="p-5" style={{background:`linear-gradient(135deg,${BLUE}08,${BLUE}18)`,borderColor:BLUE+"33"}}>
+        <div className="flex items-center gap-1.5 mb-2">
+          <Zap size={14} color={BLUE}/>
+          <span className="text-[11px] uppercase tracking-widest font-bold" style={{color:BLUE}}>Open Window</span>
+        </div>
+        <p className="text-3xl font-black" style={{color:TXT}}>{match.day}</p>
+        <p className="text-xl font-bold mt-0.5" style={{color:TXT2}}>{match.start}:00–{match.end}:00</p>
+        <div className="flex gap-5 mt-4">
+          <div className="flex items-center gap-1.5"><Clock size={13} color={TXT3}/><span className="text-sm" style={{color:TXT2}}>{match.durMins} min</span></div>
+          <div className="flex items-center gap-1.5"><Users size={13} color={TXT3}/><span className="text-sm" style={{color:TXT2}}>4 players</span></div>
+          <div className="flex items-center gap-1.5"><TrendingUp size={13} color={TXT3}/><span className="text-sm" style={{color:TXT2}}>Score {match.score}</span></div>
+        </div>
+      </Card>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <SectionLabel>Available Players</SectionLabel>
+          <span className="text-[11px] font-semibold" style={{color:BLUE}}>{matchPlayers.length} free</span>
+        </div>
+        {matchPlayers.length>4&&(
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-2 border" style={{background:"#ede9fe",borderColor:"#c4b5fd"}}>
+            <span className="text-lg">🎾</span>
+            <p className="text-xs leading-relaxed" style={{color:"#6d28d9"}}>
+              <span className="font-semibold">{matchPlayers.length} players</span> are free — coordinate on the day to decide which 4 play!
+            </p>
+          </div>
+        )}
+        <div className="flex flex-col gap-2">
+          {matchPlayers.map(p=>(
+            <Card key={p.id} className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-3">
+                <Avatar p={p}/>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-semibold" style={{color:TXT}}>{p.name}</p>
+                    {p.isMe&&<span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold text-white" style={{background:BLUE}}>You</span>}
+                  </div>
+                  <RatingBadge rating={p.rating}/>
+                </div>
+              </div>
+              <CheckCircle size={15} color={BLUE}/>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {courts.length>0&&(
+        <div>
+          <SectionLabel>Select Court</SectionLabel>
+          <div className="flex flex-col gap-1.5">
+            {courts.map(c=>(
+              <button key={c} onClick={()=>setSelected(c)}
+                className="w-full text-left px-4 py-3 rounded-xl flex items-center justify-between border"
+                style={selectedCourt===c?{background:BLUE+"08",borderColor:BLUE+"44"}:{background:SURF,borderColor:BORD}}>
+                <div className="flex items-center gap-2.5">
+                  <MapPin size={13} color={selectedCourt===c?BLUE:TXT3}/>
+                  <span className="text-sm font-medium" style={{color:selectedCourt===c?TXT:TXT2}}>{c}</span>
+                </div>
+                {selectedCourt===c&&<Check size={14} color={BLUE}/>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {courts.length===0&&<Card className="px-4 py-3 text-center"><p className="text-xs" style={{color:TXT3}}>No courts saved yet — add one in Settings.</p></Card>}
+
+      <div className="mt-2">
+        <button onClick={book}
+          className="w-full py-4 rounded-2xl text-base font-black flex items-center justify-center gap-2"
+          style={booked?{background:BLUE+"18",color:BLUE,border:`1px solid ${BLUE}44`}:{background:BLUE,color:"#fff"}}>
+          {booked?<><CheckCircle size={18} color={BLUE}/> Match Booked!</>:"Book This Match"}
+        </button>
+        <button onClick={onSchedule} className="w-full py-2.5 text-sm text-center mt-1" style={{color:TXT3}}>
+          Adjust My Availability →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Root ─────────────────────────────────────────────────────────────────────
+function PadelMeet() {
+  const urlGroupId = React.useMemo(() => {
+    const p = new URLSearchParams(window.location.search);
+    return p.get('group')||p.get('g')||null;
+  }, []);
+
+  // ── Multi-group storage ──────────────────────────────────────────────────────
+  // myGroups: [{ id, name, playerId, color, isAdmin }]
+  // myProfile: { name, rating }  — shared across all groups
+  const [myGroups,    setMyGroups]    = useLs("pm_groups",   []);
+  const [myProfile,   setMyProfile]   = useLs("pm_profile",  { name:'', rating:3.0 });
+  const [favGroupId,  setFavGroupId]  = useLs("pm_fav_group", null);
+
+  // Restore last visited group; favourite takes priority over last-visited
+  const [groupId, setGroupId] = React.useState(() => {
+    if (urlGroupId) return urlGroupId;
+    try {
+      const g = JSON.parse(localStorage.getItem('pm_groups')||'[]');
+      if (g.length === 0) return null;
+      const favId = JSON.parse(localStorage.getItem('pm_fav_group')||'null');
+      if (favId && g.some(x => x.id === favId)) return favId;
+      return g[g.length-1].id;
+    } catch { return null; }
+  });
+
+  // Sync URL when we restored a groupId from localStorage
+  React.useEffect(() => {
+    if (groupId && !urlGroupId) history.replaceState({}, '', `?group=${groupId}`);
+  }, []);
+
+  // Migrate old pm_my_info format on first run
+  React.useEffect(() => {
+    if (myGroups.length > 0) return;
+    try {
+      const old = JSON.parse(localStorage.getItem('pm_my_info')||'null');
+      if (old?.playerId && old?.groupId) {
+        setMyGroups([{ id:old.groupId, name:'', playerId:old.playerId, color:old.color, isAdmin:!!old.isAdmin }]);
+        if (!myProfile.name) setMyProfile({ name:old.name||'', rating:old.rating||3.0 });
+      }
+    } catch {}
+  }, []);
+
+  // Current group membership entry
+  const myGroupEntry   = myGroups.find(g => g.id === groupId) || null;
+  const alreadyInGroup = !!myGroupEntry;
+
+  const [groupData, setGroupData] = React.useState({ players:{}, booked:{}, name:'' });
+  const [fbLoading, setFbLoading] = React.useState(false);
+
+  // Multi-week state
+  const [weekOffset, setWeekOffset] = React.useState(0);
+  const weekKey = React.useMemo(() => getWeekKey(weekOffset), [weekOffset]);
+
+  // Per-group, per-week slots  { [groupId]: { [weekKey]: { slotKey: true } } }
+  const [allMySlots, setAllMySlots] = useLs("pm_slots_v3", {});
+  const mySlots = React.useMemo(() => allMySlots[groupId]?.[weekKey]||{}, [allMySlots, groupId, weekKey]);
+  const setMySlots = React.useCallback((updater) => {
+    setAllMySlots(prev => {
+      const gs   = prev[groupId]||{};
+      const cur  = gs[weekKey]||{};
+      const next = typeof updater==='function' ? updater(cur) : updater;
+      return { ...prev, [groupId]: { ...gs, [weekKey]: next } };
+    });
+  }, [groupId, weekKey, setAllMySlots]);
+
+  // Local settings
+  const [courts,         setCourts]         = useLs("pm_courts",     ["Club Padel Norte","Arena Sports","Padel Factory"]);
+  const [preferredCourt, setPreferredCourt] = useLs("pm_pref_court", "Club Padel Norte");
+  const [duration,       setDuration]       = useLs("pm_duration",   90);
+  const [notif,          setNotif]          = useLs("pm_notif",      true);
+
+  const [screen, setScreen] = React.useState(() => {
+    if (!FIREBASE_READY) return 'setup';
+    const target = urlGroupId || (() => {
+      try {
+        const g = JSON.parse(localStorage.getItem('pm_groups')||'[]');
+        if (!g.length) return null;
+        const favId = JSON.parse(localStorage.getItem('pm_fav_group')||'null');
+        return (favId && g.some(x=>x.id===favId)) ? favId : g[g.length-1].id;
+      } catch { return null; }
+    })();
+    if (!target) return 'onboarding';
+    try {
+      const g = JSON.parse(localStorage.getItem('pm_groups')||'[]');
+      if (g.some(x => x.id===target)) return 'loading';
+      // legacy pm_my_info fallback
+      const old = JSON.parse(localStorage.getItem('pm_my_info')||'null');
+      if (old?.groupId===target && old?.playerId) return 'loading';
+    } catch {}
+    return urlGroupId ? 'join' : 'onboarding';
+  });
+  const [picked, setPicked] = React.useState(null);
+
+  // Firebase subscription
+  React.useEffect(() => {
+    if (!db||!groupId) return;
+    setFbLoading(true);
+    const ref = db.ref(`groups/${groupId}`);
+    ref.on('value', snap => { setGroupData(snap.val()||{players:{},booked:{},name:''}); setFbLoading(false); });
+    return () => ref.off('value');
+  }, [groupId]);
+
+  // Keep local group name in sync with Firebase
+  React.useEffect(() => {
+    if (!groupId || !groupData.name) return;
+    setMyGroups(prev => prev.map(g => g.id===groupId ? { ...g, name:groupData.name } : g));
+  }, [groupData.name, groupId]);
+
+  // Routing
+  React.useEffect(() => {
+    if (!FIREBASE_READY){ setScreen('setup');     return; }
+    if (!groupId)        { setScreen('onboarding'); return; }
+    if (fbLoading)       return;
+    if (!alreadyInGroup) { setScreen('join');      return; }
+    const playersObj = groupData.players||{};
+    const hasPlayers = Object.keys(playersObj).length > 0;
+    if (hasPlayers && !playersObj[myGroupEntry?.playerId]) {
+      setMyGroups(prev => prev.filter(g => g.id!==groupId));
+      setScreen('join');
+      return;
+    }
+    setScreen(s => (s==='loading'||s==='join') ? 'dashboard' : s);
+  }, [groupId, fbLoading, alreadyInGroup, groupData.players]);
+
+  // Sync slots to Firebase (debounced)
+  const slotsTimer = React.useRef(null);
+  React.useEffect(() => {
+    if (!db||!groupId||!myGroupEntry?.playerId) return;
+    clearTimeout(slotsTimer.current);
+    slotsTimer.current = setTimeout(() => {
+      db.ref(`groups/${groupId}/players/${myGroupEntry.playerId}/weeks/${weekKey}`).set(mySlots);
+    }, 500);
+  }, [mySlots, weekKey]);
+
+  // Sync name/rating to Firebase
+  React.useEffect(() => {
+    if (!db||!groupId||!myGroupEntry?.playerId) return;
+    db.ref(`groups/${groupId}/players/${myGroupEntry.playerId}`).update({ name:myProfile.name, rating:myProfile.rating, color:myGroupEntry.color });
+  }, [myProfile.name, myProfile.rating]);
+
+  // Sync preferred court → Firebase (any member can set the group court)
+  React.useEffect(() => {
+    if (!db||!groupId||!preferredCourt) return;
+    db.ref(`groups/${groupId}/court`).set(preferredCourt);
+  }, [preferredCourt, groupId]);
+
+  // Pull court from Firebase → local state (keeps all members in sync)
+  React.useEffect(() => {
+    if (groupData.court && groupData.court !== preferredCourt) setPreferredCourt(groupData.court);
+  }, [groupData.court]);
+
+  // Handlers
+  const handleCreateGroup = React.useCallback(() => {
+    const code = generateGroupCode();
+    history.pushState({}, '', `?group=${code}`);
+    setGroupId(code);
+    setGroupData({ players:{}, booked:{}, name:'' });
+    setScreen('join');
+  }, []);
+
+  const handleJoinCode = (code) => {
+    const c = code.trim().toLowerCase();
+    history.pushState({}, '', `?group=${c}`);
+    setGroupId(c);
+    setGroupData({ players:{}, booked:{}, name:'' });
+    setScreen('join');
+  };
+
+  const handleJoin = ({ name, rating, groupName:gName }) => {
+    const existing = Object.keys(groupData.players||{});
+    const isAdmin  = existing.length === 0;
+    const color    = PLAYER_COLORS[existing.length % PLAYER_COLORS.length];
+    const playerId = generatePlayerId();
+    setMyProfile({ name, rating });
+    setMyGroups(prev => {
+      const filtered = prev.filter(g => g.id!==groupId);
+      return [...filtered, { id:groupId, name:gName||groupData.name||'', playerId, color, isAdmin }];
+    });
+    if (db&&groupId) {
+      db.ref(`groups/${groupId}/players/${playerId}`).set({ name,rating,color, weeks:{ [weekKey]:{} }, joinedAt:Date.now() });
+      if (gName) db.ref(`groups/${groupId}/name`).set(gName);
+    }
+    setScreen('dashboard');
+  };
+
+  const handleSwitchGroup = React.useCallback((gid) => {
+    if (gid===groupId) return;
+    history.pushState({}, '', `?group=${gid}`);
+    setGroupId(gid);
+    setGroupData({ players:{}, booked:{}, name:'' });
+    setFbLoading(true);
+    setScreen('loading');
+  }, [groupId]);
+
+  const bookMatch = React.useCallback((match) => {
+    if (db&&groupId) db.ref(`groups/${groupId}/booked/${match.id}`).set({ ...match, bookedBy:myGroupEntry?.playerId, bookedAt:Date.now() });
+  }, [groupId, myGroupEntry]);
+
+  const deletePlayer = React.useCallback((pid) => {
+    if (db&&groupId) db.ref(`groups/${groupId}/players/${pid}`).remove();
+  }, [groupId]);
+
+  const setUserName   = name   => setMyProfile(prev=>({...prev,name}));
+  const setUserRating = rating => setMyProfile(prev=>({...prev,rating}));
+  const groupName     = groupData.name||'';
+  const updateGroupName = React.useCallback(name => { if(db&&groupId) db.ref(`groups/${groupId}/name`).set(name); }, [groupId]);
+
+  // Derived
+  const players = React.useMemo(() =>
+    Object.entries(groupData.players||{}).map(([pid,p],i)=>({
+      id:pid, name:p.name||'?', rating:p.rating||3.0,
+      color:     p.color||PLAYER_COLORS[i%PLAYER_COLORS.length],
+      slotCount: Object.keys(p.weeks?.[weekKey]||{}).length,
+      filled:    Object.keys(p.weeks?.[weekKey]||{}).length>0,
+      isMe:      pid===myGroupEntry?.playerId,
+    })),
+  [groupData.players, myGroupEntry?.playerId, weekKey]);
+
+  const removeGroup = React.useCallback((gid) => {
+    setMyGroups(prev => prev.filter(g => g.id !== gid));
+    if (favGroupId === gid) setFavGroupId(null);
+  }, [favGroupId]);
+
+  const fullAvail = React.useMemo(() => {
+    const a = {};
+    Object.entries(groupData.players||{}).forEach(([pid,p]) => { a[pid]=slotsToAvail(p.weeks?.[weekKey]||{}); });
+    return a;
+  }, [groupData.players, weekKey]);
+
+  const matches       = React.useMemo(()=>computeMatches(fullAvail),[fullAvail]);
+  const bookedMatches = React.useMemo(()=>Object.values(groupData.booked||{}),[groupData.booked]);
+  const myPlayer      = players.find(p=>p.isMe)||{ name:myProfile.name||"You", rating:myProfile.rating||3.0, color:myGroupEntry?.color||BLUE };
+  const isAdminNow    = !!myGroupEntry?.isAdmin || localStorage.getItem('pm_force_admin')==='true';
+  const groupCourt    = groupData.court || preferredCourt || null;
+
+  const showNav  = ['dashboard','availability','preferences'].includes(screen);
+  const showTop  = !['setup','onboarding'].includes(screen);
+
+  return (
+    <div style={{minHeight:"100vh", background:BG}}>
+      {showTop && <TopBar groupName={groupName} bookedCount={bookedMatches.length}/>}
+
+      <main className="max-w-2xl mx-auto px-4" style={{paddingBottom: showNav ? 80 : 16}}>
+        {screen==='setup'      && <SetupScreen/>}
+        {screen==='onboarding' && <OnboardingScreen onCreate={handleCreateGroup} onJoinCode={handleJoinCode}/>}
+        {screen==='loading'    && (
+          <div className="flex flex-col items-center justify-center py-24 gap-3">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl" style={{background:BLUE+"18"}}>🎾</div>
+            <p className="text-sm" style={{color:TXT2}}>Loading group...</p>
+            <p className="text-[10px] font-mono" style={{color:TXT3}}>#{groupId}</p>
+          </div>
+        )}
+        {screen==='join' && (
+          <JoinGroupScreen groupId={groupId} existingCount={Object.keys(groupData.players||{}).length} onJoin={handleJoin}/>
+        )}
+        {screen==='dashboard' && (
+          <Dashboard matches={matches} players={players} myPlayerId={myGroupEntry?.playerId}
+            bookedMatches={bookedMatches} groupId={groupId} groupName={groupName}
+            onUpdateGroupName={updateGroupName}
+            isAdmin={isAdminNow} onDeletePlayer={deletePlayer}
+            onPick={m=>{setPicked(m);setScreen('detail');}}
+            onGoSchedule={()=>setScreen('availability')}
+            myGroups={myGroups} onSwitchGroup={handleSwitchGroup} onCreateGroup={handleCreateGroup}
+            groupCourt={groupCourt}
+            groupUrl={`${window.location.origin}${window.location.pathname}?group=${groupId}`}
+            favGroupId={favGroupId}/>
+        )}
+        {screen==='availability' && (
+          <Availability mySlots={mySlots} setMySlots={setMySlots}
+            groupPlayers={groupData.players||{}} weekKey={weekKey}
+            weekOffset={weekOffset} setWeekOffset={setWeekOffset}/>
+        )}
+        {screen==='preferences' && (
+          <SettingsScreen
+            userName={myPlayer.name}        setUserName={setUserName}
+            userRating={myPlayer.rating}    setUserRating={setUserRating}
+            groupName={groupName}           setGroupName={updateGroupName}
+            courts={courts}                 setCourts={setCourts}
+            preferredCourt={preferredCourt} setPreferredCourt={setPreferredCourt}
+            duration={duration}             setDuration={setDuration}
+            notif={notif}                   setNotif={setNotif}
+            myGroups={myGroups}             removeGroup={removeGroup}
+            favGroupId={favGroupId}         setFavGroupId={setFavGroupId}
+            activeGroupId={groupId}         onSwitchGroup={handleSwitchGroup}/>
+        )}
+        {screen==='detail' && picked && (
+          <MatchDetail match={picked} players={players} courts={courts}
+            preferredCourt={preferredCourt}
+            onBack={()=>setScreen('dashboard')} onBook={bookMatch}
+            onSchedule={()=>setScreen('availability')}/>
+        )}
+      </main>
+
+      {showNav && screen!=='detail' && <BottomNav screen={screen} setScreen={setScreen}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<PadelMeet/>);
+  </script>
+
+  <div style="position:fixed;top:10px;right:12px;z-index:9999;">
+    <button onclick="localStorage.setItem('isAdmin','true');localStorage.setItem('pm_force_admin','true');location.reload();"
+      style="font-size:11px;color:#64748b;background:rgba(255,255,255,0.9);border:1px solid #cbd5e1;border-radius:6px;padding:4px 10px;cursor:pointer;font-family:inherit;">
+      Activate Admin Mode
+    </button>
+  </div>
+</body>
+</html>
