@@ -26,7 +26,12 @@
 </head>
 <body>
   <div id="root"></div>
-  <script type="text/babel" data-presets="react">
+  <script>
+    Babel.registerPreset('react-classic', {
+      presets: [[Babel.availablePresets['react'], { runtime: 'classic' }]]
+    });
+  </script>
+  <script type="text/babel" data-presets="react-classic">
 
 // ─── Firebase Config ──────────────────────────────────────────────────────────
 const FIREBASE_CONFIG = {
